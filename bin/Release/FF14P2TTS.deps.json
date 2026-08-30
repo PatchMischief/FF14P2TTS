@@ -1,0 +1,618 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "FF14P2TTS/1.0.0.9": {
+        "dependencies": {
+          "Microsoft.CognitiveServices.Speech": "1.45.0",
+          "System.Windows.Extensions": "9.0.0"
+        },
+        "runtime": {
+          "FF14P2TTS.dll": {}
+        }
+      },
+      "Azure.Core/1.44.1": {
+        "dependencies": {
+          "Microsoft.Bcl.AsyncInterfaces": "6.0.0",
+          "System.ClientModel": "1.1.0",
+          "System.Memory.Data": "6.0.0"
+        },
+        "runtime": {
+          "lib/net6.0/Azure.Core.dll": {
+            "assemblyVersion": "1.44.1.0",
+            "fileVersion": "1.4400.124.50905",
+            "localPath": "Azure.Core.dll"
+          }
+        }
+      },
+      "Microsoft.Bcl.AsyncInterfaces/6.0.0": {
+        "runtime": {
+          "lib/netstandard2.1/Microsoft.Bcl.AsyncInterfaces.dll": {
+            "assemblyVersion": "6.0.0.0",
+            "fileVersion": "6.0.21.52210",
+            "localPath": "Microsoft.Bcl.AsyncInterfaces.dll"
+          }
+        }
+      },
+      "Microsoft.CognitiveServices.Speech/1.45.0": {
+        "dependencies": {
+          "Azure.Core": "1.44.1"
+        },
+        "runtime": {
+          "lib/netstandard2.0/Microsoft.CognitiveServices.Speech.csharp.dll": {
+            "assemblyVersion": "1.45.0.28",
+            "fileVersion": "1.45.0.28",
+            "localPath": "Microsoft.CognitiveServices.Speech.csharp.dll"
+          }
+        },
+        "runtimeTargets": {
+          "runtimes/linux-arm/lib/netstandard2.0/Microsoft.CognitiveServices.Speech.csharp.dll": {
+            "rid": "linux-arm",
+            "assetType": "runtime",
+            "assemblyVersion": "1.45.0.28",
+            "fileVersion": "1.45.0.28",
+            "localPath": "runtimes/linux-arm/lib/netstandard2.0/Microsoft.CognitiveServices.Speech.csharp.dll"
+          },
+          "runtimes/linux-arm64/lib/netstandard2.0/Microsoft.CognitiveServices.Speech.csharp.dll": {
+            "rid": "linux-arm64",
+            "assetType": "runtime",
+            "assemblyVersion": "1.45.0.28",
+            "fileVersion": "1.45.0.28",
+            "localPath": "runtimes/linux-arm64/lib/netstandard2.0/Microsoft.CognitiveServices.Speech.csharp.dll"
+          },
+          "runtimes/linux-x64/lib/netstandard2.0/Microsoft.CognitiveServices.Speech.csharp.dll": {
+            "rid": "linux-x64",
+            "assetType": "runtime",
+            "assemblyVersion": "1.45.0.28",
+            "fileVersion": "1.45.0.28",
+            "localPath": "runtimes/linux-x64/lib/netstandard2.0/Microsoft.CognitiveServices.Speech.csharp.dll"
+          },
+          "runtimes/osx-arm64/lib/netstandard2.0/Microsoft.CognitiveServices.Speech.csharp.dll": {
+            "rid": "osx-arm64",
+            "assetType": "runtime",
+            "assemblyVersion": "1.45.0.28",
+            "fileVersion": "1.45.0.28",
+            "localPath": "runtimes/osx-arm64/lib/netstandard2.0/Microsoft.CognitiveServices.Speech.csharp.dll"
+          },
+          "runtimes/osx-x64/lib/netstandard2.0/Microsoft.CognitiveServices.Speech.csharp.dll": {
+            "rid": "osx-x64",
+            "assetType": "runtime",
+            "assemblyVersion": "1.45.0.28",
+            "fileVersion": "1.45.0.28",
+            "localPath": "runtimes/osx-x64/lib/netstandard2.0/Microsoft.CognitiveServices.Speech.csharp.dll"
+          },
+          "runtimes/android-arm/native/libMicrosoft.CognitiveServices.Speech.core.so": {
+            "rid": "android-arm",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/android-arm/native/libMicrosoft.CognitiveServices.Speech.core.so"
+          },
+          "runtimes/android-arm/native/libMicrosoft.CognitiveServices.Speech.extension.audio.sys.so": {
+            "rid": "android-arm",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/android-arm/native/libMicrosoft.CognitiveServices.Speech.extension.audio.sys.so"
+          },
+          "runtimes/android-arm/native/libMicrosoft.CognitiveServices.Speech.extension.kws.ort.so": {
+            "rid": "android-arm",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/android-arm/native/libMicrosoft.CognitiveServices.Speech.extension.kws.ort.so"
+          },
+          "runtimes/android-arm/native/libMicrosoft.CognitiveServices.Speech.extension.kws.so": {
+            "rid": "android-arm",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/android-arm/native/libMicrosoft.CognitiveServices.Speech.extension.kws.so"
+          },
+          "runtimes/android-arm/native/libMicrosoft.CognitiveServices.Speech.extension.lu.so": {
+            "rid": "android-arm",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/android-arm/native/libMicrosoft.CognitiveServices.Speech.extension.lu.so"
+          },
+          "runtimes/android-arm64/native/libMicrosoft.CognitiveServices.Speech.core.so": {
+            "rid": "android-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/android-arm64/native/libMicrosoft.CognitiveServices.Speech.core.so"
+          },
+          "runtimes/android-arm64/native/libMicrosoft.CognitiveServices.Speech.extension.audio.sys.so": {
+            "rid": "android-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/android-arm64/native/libMicrosoft.CognitiveServices.Speech.extension.audio.sys.so"
+          },
+          "runtimes/android-arm64/native/libMicrosoft.CognitiveServices.Speech.extension.kws.ort.so": {
+            "rid": "android-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/android-arm64/native/libMicrosoft.CognitiveServices.Speech.extension.kws.ort.so"
+          },
+          "runtimes/android-arm64/native/libMicrosoft.CognitiveServices.Speech.extension.kws.so": {
+            "rid": "android-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/android-arm64/native/libMicrosoft.CognitiveServices.Speech.extension.kws.so"
+          },
+          "runtimes/android-arm64/native/libMicrosoft.CognitiveServices.Speech.extension.lu.so": {
+            "rid": "android-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/android-arm64/native/libMicrosoft.CognitiveServices.Speech.extension.lu.so"
+          },
+          "runtimes/android-x64/native/libMicrosoft.CognitiveServices.Speech.core.so": {
+            "rid": "android-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/android-x64/native/libMicrosoft.CognitiveServices.Speech.core.so"
+          },
+          "runtimes/android-x64/native/libMicrosoft.CognitiveServices.Speech.extension.audio.sys.so": {
+            "rid": "android-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/android-x64/native/libMicrosoft.CognitiveServices.Speech.extension.audio.sys.so"
+          },
+          "runtimes/android-x64/native/libMicrosoft.CognitiveServices.Speech.extension.kws.ort.so": {
+            "rid": "android-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/android-x64/native/libMicrosoft.CognitiveServices.Speech.extension.kws.ort.so"
+          },
+          "runtimes/android-x64/native/libMicrosoft.CognitiveServices.Speech.extension.kws.so": {
+            "rid": "android-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/android-x64/native/libMicrosoft.CognitiveServices.Speech.extension.kws.so"
+          },
+          "runtimes/android-x64/native/libMicrosoft.CognitiveServices.Speech.extension.lu.so": {
+            "rid": "android-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/android-x64/native/libMicrosoft.CognitiveServices.Speech.extension.lu.so"
+          },
+          "runtimes/android-x86/native/libMicrosoft.CognitiveServices.Speech.core.so": {
+            "rid": "android-x86",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/android-x86/native/libMicrosoft.CognitiveServices.Speech.core.so"
+          },
+          "runtimes/android-x86/native/libMicrosoft.CognitiveServices.Speech.extension.audio.sys.so": {
+            "rid": "android-x86",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/android-x86/native/libMicrosoft.CognitiveServices.Speech.extension.audio.sys.so"
+          },
+          "runtimes/android-x86/native/libMicrosoft.CognitiveServices.Speech.extension.kws.ort.so": {
+            "rid": "android-x86",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/android-x86/native/libMicrosoft.CognitiveServices.Speech.extension.kws.ort.so"
+          },
+          "runtimes/android-x86/native/libMicrosoft.CognitiveServices.Speech.extension.kws.so": {
+            "rid": "android-x86",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/android-x86/native/libMicrosoft.CognitiveServices.Speech.extension.kws.so"
+          },
+          "runtimes/android-x86/native/libMicrosoft.CognitiveServices.Speech.extension.lu.so": {
+            "rid": "android-x86",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/android-x86/native/libMicrosoft.CognitiveServices.Speech.extension.lu.so"
+          },
+          "runtimes/ios-arm64/native/libMicrosoft.CognitiveServices.Speech.core.a": {
+            "rid": "ios-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/ios-arm64/native/libMicrosoft.CognitiveServices.Speech.core.a"
+          },
+          "runtimes/iossimulator-arm64/native/libMicrosoft.CognitiveServices.Speech.core.a": {
+            "rid": "iossimulator-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/iossimulator-arm64/native/libMicrosoft.CognitiveServices.Speech.core.a"
+          },
+          "runtimes/iossimulator-x64/native/libMicrosoft.CognitiveServices.Speech.core.a": {
+            "rid": "iossimulator-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/iossimulator-x64/native/libMicrosoft.CognitiveServices.Speech.core.a"
+          },
+          "runtimes/linux-arm/native/libMicrosoft.CognitiveServices.Speech.core.so": {
+            "rid": "linux-arm",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/linux-arm/native/libMicrosoft.CognitiveServices.Speech.core.so"
+          },
+          "runtimes/linux-arm/native/libMicrosoft.CognitiveServices.Speech.extension.audio.sys.so": {
+            "rid": "linux-arm",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/linux-arm/native/libMicrosoft.CognitiveServices.Speech.extension.audio.sys.so"
+          },
+          "runtimes/linux-arm/native/libMicrosoft.CognitiveServices.Speech.extension.codec.so": {
+            "rid": "linux-arm",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/linux-arm/native/libMicrosoft.CognitiveServices.Speech.extension.codec.so"
+          },
+          "runtimes/linux-arm/native/libMicrosoft.CognitiveServices.Speech.extension.kws.ort.so": {
+            "rid": "linux-arm",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/linux-arm/native/libMicrosoft.CognitiveServices.Speech.extension.kws.ort.so"
+          },
+          "runtimes/linux-arm/native/libMicrosoft.CognitiveServices.Speech.extension.kws.so": {
+            "rid": "linux-arm",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/linux-arm/native/libMicrosoft.CognitiveServices.Speech.extension.kws.so"
+          },
+          "runtimes/linux-arm/native/libMicrosoft.CognitiveServices.Speech.extension.lu.so": {
+            "rid": "linux-arm",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/linux-arm/native/libMicrosoft.CognitiveServices.Speech.extension.lu.so"
+          },
+          "runtimes/linux-arm/native/libpal_azure_c_shared.so": {
+            "rid": "linux-arm",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/linux-arm/native/libpal_azure_c_shared.so"
+          },
+          "runtimes/linux-arm/native/libpal_azure_c_shared_openssl3.so": {
+            "rid": "linux-arm",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/linux-arm/native/libpal_azure_c_shared_openssl3.so"
+          },
+          "runtimes/linux-arm64/native/libMicrosoft.CognitiveServices.Speech.core.so": {
+            "rid": "linux-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/linux-arm64/native/libMicrosoft.CognitiveServices.Speech.core.so"
+          },
+          "runtimes/linux-arm64/native/libMicrosoft.CognitiveServices.Speech.extension.audio.sys.so": {
+            "rid": "linux-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/linux-arm64/native/libMicrosoft.CognitiveServices.Speech.extension.audio.sys.so"
+          },
+          "runtimes/linux-arm64/native/libMicrosoft.CognitiveServices.Speech.extension.codec.so": {
+            "rid": "linux-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/linux-arm64/native/libMicrosoft.CognitiveServices.Speech.extension.codec.so"
+          },
+          "runtimes/linux-arm64/native/libMicrosoft.CognitiveServices.Speech.extension.kws.ort.so": {
+            "rid": "linux-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/linux-arm64/native/libMicrosoft.CognitiveServices.Speech.extension.kws.ort.so"
+          },
+          "runtimes/linux-arm64/native/libMicrosoft.CognitiveServices.Speech.extension.kws.so": {
+            "rid": "linux-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/linux-arm64/native/libMicrosoft.CognitiveServices.Speech.extension.kws.so"
+          },
+          "runtimes/linux-arm64/native/libMicrosoft.CognitiveServices.Speech.extension.lu.so": {
+            "rid": "linux-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/linux-arm64/native/libMicrosoft.CognitiveServices.Speech.extension.lu.so"
+          },
+          "runtimes/linux-arm64/native/libpal_azure_c_shared.so": {
+            "rid": "linux-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/linux-arm64/native/libpal_azure_c_shared.so"
+          },
+          "runtimes/linux-arm64/native/libpal_azure_c_shared_openssl3.so": {
+            "rid": "linux-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/linux-arm64/native/libpal_azure_c_shared_openssl3.so"
+          },
+          "runtimes/linux-x64/native/libMicrosoft.CognitiveServices.Speech.core.so": {
+            "rid": "linux-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/linux-x64/native/libMicrosoft.CognitiveServices.Speech.core.so"
+          },
+          "runtimes/linux-x64/native/libMicrosoft.CognitiveServices.Speech.extension.audio.sys.so": {
+            "rid": "linux-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/linux-x64/native/libMicrosoft.CognitiveServices.Speech.extension.audio.sys.so"
+          },
+          "runtimes/linux-x64/native/libMicrosoft.CognitiveServices.Speech.extension.codec.so": {
+            "rid": "linux-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/linux-x64/native/libMicrosoft.CognitiveServices.Speech.extension.codec.so"
+          },
+          "runtimes/linux-x64/native/libMicrosoft.CognitiveServices.Speech.extension.kws.ort.so": {
+            "rid": "linux-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/linux-x64/native/libMicrosoft.CognitiveServices.Speech.extension.kws.ort.so"
+          },
+          "runtimes/linux-x64/native/libMicrosoft.CognitiveServices.Speech.extension.kws.so": {
+            "rid": "linux-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/linux-x64/native/libMicrosoft.CognitiveServices.Speech.extension.kws.so"
+          },
+          "runtimes/linux-x64/native/libMicrosoft.CognitiveServices.Speech.extension.lu.so": {
+            "rid": "linux-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/linux-x64/native/libMicrosoft.CognitiveServices.Speech.extension.lu.so"
+          },
+          "runtimes/linux-x64/native/libpal_azure_c_shared.so": {
+            "rid": "linux-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/linux-x64/native/libpal_azure_c_shared.so"
+          },
+          "runtimes/linux-x64/native/libpal_azure_c_shared_openssl3.so": {
+            "rid": "linux-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/linux-x64/native/libpal_azure_c_shared_openssl3.so"
+          },
+          "runtimes/maccatalyst-arm64/native/libMicrosoft.CognitiveServices.Speech.core.a": {
+            "rid": "maccatalyst-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/maccatalyst-arm64/native/libMicrosoft.CognitiveServices.Speech.core.a"
+          },
+          "runtimes/maccatalyst-x64/native/libMicrosoft.CognitiveServices.Speech.core.a": {
+            "rid": "maccatalyst-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/maccatalyst-x64/native/libMicrosoft.CognitiveServices.Speech.core.a"
+          },
+          "runtimes/osx-arm64/native/libMicrosoft.CognitiveServices.Speech.core.dylib": {
+            "rid": "osx-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/osx-arm64/native/libMicrosoft.CognitiveServices.Speech.core.dylib"
+          },
+          "runtimes/osx-arm64/native/libMicrosoft.CognitiveServices.Speech.extension.kws.ort.dylib": {
+            "rid": "osx-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/osx-arm64/native/libMicrosoft.CognitiveServices.Speech.extension.kws.ort.dylib"
+          },
+          "runtimes/osx-x64/native/libMicrosoft.CognitiveServices.Speech.core.dylib": {
+            "rid": "osx-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/osx-x64/native/libMicrosoft.CognitiveServices.Speech.core.dylib"
+          },
+          "runtimes/osx-x64/native/libMicrosoft.CognitiveServices.Speech.extension.kws.ort.dylib": {
+            "rid": "osx-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/osx-x64/native/libMicrosoft.CognitiveServices.Speech.extension.kws.ort.dylib"
+          },
+          "runtimes/win-arm/native/Microsoft.CognitiveServices.Speech.core.dll": {
+            "rid": "win-arm",
+            "assetType": "native",
+            "fileVersion": "1.45.0.28",
+            "localPath": "runtimes/win-arm/native/Microsoft.CognitiveServices.Speech.core.dll"
+          },
+          "runtimes/win-arm/native/Microsoft.CognitiveServices.Speech.extension.audio.sys.dll": {
+            "rid": "win-arm",
+            "assetType": "native",
+            "fileVersion": "1.45.0.28",
+            "localPath": "runtimes/win-arm/native/Microsoft.CognitiveServices.Speech.extension.audio.sys.dll"
+          },
+          "runtimes/win-arm/native/Microsoft.CognitiveServices.Speech.extension.lu.dll": {
+            "rid": "win-arm",
+            "assetType": "native",
+            "fileVersion": "1.45.0.28",
+            "localPath": "runtimes/win-arm/native/Microsoft.CognitiveServices.Speech.extension.lu.dll"
+          },
+          "runtimes/win-arm64/native/Microsoft.CognitiveServices.Speech.core.dll": {
+            "rid": "win-arm64",
+            "assetType": "native",
+            "fileVersion": "1.45.0.28",
+            "localPath": "runtimes/win-arm64/native/Microsoft.CognitiveServices.Speech.core.dll"
+          },
+          "runtimes/win-arm64/native/Microsoft.CognitiveServices.Speech.extension.audio.sys.dll": {
+            "rid": "win-arm64",
+            "assetType": "native",
+            "fileVersion": "1.45.0.28",
+            "localPath": "runtimes/win-arm64/native/Microsoft.CognitiveServices.Speech.extension.audio.sys.dll"
+          },
+          "runtimes/win-arm64/native/Microsoft.CognitiveServices.Speech.extension.kws.dll": {
+            "rid": "win-arm64",
+            "assetType": "native",
+            "fileVersion": "1.45.0.28",
+            "localPath": "runtimes/win-arm64/native/Microsoft.CognitiveServices.Speech.extension.kws.dll"
+          },
+          "runtimes/win-arm64/native/Microsoft.CognitiveServices.Speech.extension.kws.ort.dll": {
+            "rid": "win-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/win-arm64/native/Microsoft.CognitiveServices.Speech.extension.kws.ort.dll"
+          },
+          "runtimes/win-arm64/native/Microsoft.CognitiveServices.Speech.extension.lu.dll": {
+            "rid": "win-arm64",
+            "assetType": "native",
+            "fileVersion": "1.45.0.28",
+            "localPath": "runtimes/win-arm64/native/Microsoft.CognitiveServices.Speech.extension.lu.dll"
+          },
+          "runtimes/win-x64/native/Microsoft.CognitiveServices.Speech.core.dll": {
+            "rid": "win-x64",
+            "assetType": "native",
+            "fileVersion": "1.45.0.28",
+            "localPath": "runtimes/win-x64/native/Microsoft.CognitiveServices.Speech.core.dll"
+          },
+          "runtimes/win-x64/native/Microsoft.CognitiveServices.Speech.extension.audio.sys.dll": {
+            "rid": "win-x64",
+            "assetType": "native",
+            "fileVersion": "1.45.0.28",
+            "localPath": "runtimes/win-x64/native/Microsoft.CognitiveServices.Speech.extension.audio.sys.dll"
+          },
+          "runtimes/win-x64/native/Microsoft.CognitiveServices.Speech.extension.codec.dll": {
+            "rid": "win-x64",
+            "assetType": "native",
+            "fileVersion": "1.45.0.28",
+            "localPath": "runtimes/win-x64/native/Microsoft.CognitiveServices.Speech.extension.codec.dll"
+          },
+          "runtimes/win-x64/native/Microsoft.CognitiveServices.Speech.extension.kws.dll": {
+            "rid": "win-x64",
+            "assetType": "native",
+            "fileVersion": "1.45.0.28",
+            "localPath": "runtimes/win-x64/native/Microsoft.CognitiveServices.Speech.extension.kws.dll"
+          },
+          "runtimes/win-x64/native/Microsoft.CognitiveServices.Speech.extension.kws.ort.dll": {
+            "rid": "win-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/win-x64/native/Microsoft.CognitiveServices.Speech.extension.kws.ort.dll"
+          },
+          "runtimes/win-x64/native/Microsoft.CognitiveServices.Speech.extension.lu.dll": {
+            "rid": "win-x64",
+            "assetType": "native",
+            "fileVersion": "1.45.0.28",
+            "localPath": "runtimes/win-x64/native/Microsoft.CognitiveServices.Speech.extension.lu.dll"
+          },
+          "runtimes/win-x86/native/Microsoft.CognitiveServices.Speech.core.dll": {
+            "rid": "win-x86",
+            "assetType": "native",
+            "fileVersion": "1.45.0.28",
+            "localPath": "runtimes/win-x86/native/Microsoft.CognitiveServices.Speech.core.dll"
+          },
+          "runtimes/win-x86/native/Microsoft.CognitiveServices.Speech.extension.audio.sys.dll": {
+            "rid": "win-x86",
+            "assetType": "native",
+            "fileVersion": "1.45.0.28",
+            "localPath": "runtimes/win-x86/native/Microsoft.CognitiveServices.Speech.extension.audio.sys.dll"
+          },
+          "runtimes/win-x86/native/Microsoft.CognitiveServices.Speech.extension.codec.dll": {
+            "rid": "win-x86",
+            "assetType": "native",
+            "fileVersion": "1.45.0.28",
+            "localPath": "runtimes/win-x86/native/Microsoft.CognitiveServices.Speech.extension.codec.dll"
+          },
+          "runtimes/win-x86/native/Microsoft.CognitiveServices.Speech.extension.kws.dll": {
+            "rid": "win-x86",
+            "assetType": "native",
+            "fileVersion": "1.45.0.28",
+            "localPath": "runtimes/win-x86/native/Microsoft.CognitiveServices.Speech.extension.kws.dll"
+          },
+          "runtimes/win-x86/native/Microsoft.CognitiveServices.Speech.extension.kws.ort.dll": {
+            "rid": "win-x86",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0",
+            "localPath": "runtimes/win-x86/native/Microsoft.CognitiveServices.Speech.extension.kws.ort.dll"
+          },
+          "runtimes/win-x86/native/Microsoft.CognitiveServices.Speech.extension.lu.dll": {
+            "rid": "win-x86",
+            "assetType": "native",
+            "fileVersion": "1.45.0.28",
+            "localPath": "runtimes/win-x86/native/Microsoft.CognitiveServices.Speech.extension.lu.dll"
+          }
+        }
+      },
+      "System.ClientModel/1.1.0": {
+        "dependencies": {
+          "System.Memory.Data": "6.0.0"
+        },
+        "runtime": {
+          "lib/net6.0/System.ClientModel.dll": {
+            "assemblyVersion": "1.1.0.0",
+            "fileVersion": "1.100.24.46703",
+            "localPath": "System.ClientModel.dll"
+          }
+        }
+      },
+      "System.Memory.Data/6.0.0": {
+        "runtime": {
+          "lib/net6.0/System.Memory.Data.dll": {
+            "assemblyVersion": "6.0.0.0",
+            "fileVersion": "6.0.21.52210",
+            "localPath": "System.Memory.Data.dll"
+          }
+        }
+      },
+      "System.Windows.Extensions/9.0.0": {
+        "runtime": {
+          "lib/net9.0/System.Windows.Extensions.dll": {
+            "assemblyVersion": "9.0.0.0",
+            "fileVersion": "9.0.24.52809",
+            "localPath": "System.Windows.Extensions.dll"
+          }
+        },
+        "runtimeTargets": {
+          "runtimes/win/lib/net9.0/System.Windows.Extensions.dll": {
+            "rid": "win",
+            "assetType": "runtime",
+            "assemblyVersion": "9.0.0.0",
+            "fileVersion": "9.0.24.52809",
+            "localPath": "runtimes/win/lib/net9.0/System.Windows.Extensions.dll"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "FF14P2TTS/1.0.0.9": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Azure.Core/1.44.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-YyznXLQZCregzHvioip07/BkzjuWNXogJEVz9T5W6TwjNr17ax41YGzYMptlo2G10oLCuVPoyva62y0SIRDixg==",
+      "path": "azure.core/1.44.1",
+      "hashPath": "azure.core.1.44.1.nupkg.sha512"
+    },
+    "Microsoft.Bcl.AsyncInterfaces/6.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-UcSjPsst+DfAdJGVDsu346FX0ci0ah+lw3WRtn18NUwEqRt70HaOQ7lI72vy3+1LxtqI3T5GWwV39rQSrCzAeg==",
+      "path": "microsoft.bcl.asyncinterfaces/6.0.0",
+      "hashPath": "microsoft.bcl.asyncinterfaces.6.0.0.nupkg.sha512"
+    },
+    "Microsoft.CognitiveServices.Speech/1.45.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-F9HmxEBXjQNgVs/HoSv/tVhepmNKPvip7DVXa5N7oOCfhQMUj1T4aP/lCxyHTz43ifJpLsBOUo3lkYvqS6xjgw==",
+      "path": "microsoft.cognitiveservices.speech/1.45.0",
+      "hashPath": "microsoft.cognitiveservices.speech.1.45.0.nupkg.sha512"
+    },
+    "System.ClientModel/1.1.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-UocOlCkxLZrG2CKMAAImPcldJTxeesHnHGHwhJ0pNlZEvEXcWKuQvVOER2/NiOkJGRJk978SNdw3j6/7O9H1lg==",
+      "path": "system.clientmodel/1.1.0",
+      "hashPath": "system.clientmodel.1.1.0.nupkg.sha512"
+    },
+    "System.Memory.Data/6.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-ntFHArH3I4Lpjf5m4DCXQHJuGwWPNVJPaAvM95Jy/u+2Yzt2ryiyIN04LAogkjP9DeRcEOiviAjQotfmPq/FrQ==",
+      "path": "system.memory.data/6.0.0",
+      "hashPath": "system.memory.data.6.0.0.nupkg.sha512"
+    },
+    "System.Windows.Extensions/9.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-U9msthvnH2Fsw7xwAvIhNHOdnIjOQTwOc8Vd0oGOsiRcGMGoBFlUD6qtYawRUoQdKH9ysxesZ9juFElt1Jw/7A==",
+      "path": "system.windows.extensions/9.0.0",
+      "hashPath": "system.windows.extensions.9.0.0.nupkg.sha512"
+    }
+  }
+}

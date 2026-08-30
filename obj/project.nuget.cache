@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "dgSpecHash": "WmuhVlgcmk8=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\kenan\\Desktop\\Kenan\\ff14p2tts\\FF14P2TTS\\FF14P2TTS.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\kenan\\.nuget\\packages\\azure.core\\1.44.1\\azure.core.1.44.1.nupkg.sha512",
+    "C:\\Users\\kenan\\.nuget\\packages\\dalamudpackager\\15.0.0\\dalamudpackager.15.0.0.nupkg.sha512",
+    "C:\\Users\\kenan\\.nuget\\packages\\dotnet.reproduciblebuilds\\1.2.39\\dotnet.reproduciblebuilds.1.2.39.nupkg.sha512",
+    "C:\\Users\\kenan\\.nuget\\packages\\microsoft.bcl.asyncinterfaces\\6.0.0\\microsoft.bcl.asyncinterfaces.6.0.0.nupkg.sha512",
+    "C:\\Users\\kenan\\.nuget\\packages\\microsoft.cognitiveservices.speech\\1.45.0\\microsoft.cognitiveservices.speech.1.45.0.nupkg.sha512",
+    "C:\\Users\\kenan\\.nuget\\packages\\system.clientmodel\\1.1.0\\system.clientmodel.1.1.0.nupkg.sha512",
+    "C:\\Users\\kenan\\.nuget\\packages\\system.memory.data\\6.0.0\\system.memory.data.6.0.0.nupkg.sha512",
+    "C:\\Users\\kenan\\.nuget\\packages\\system.windows.extensions\\9.0.0\\system.windows.extensions.9.0.0.nupkg.sha512",
+    "C:\\Users\\kenan\\.nuget\\packages\\microsoft.netcore.app.ref\\10.0.8\\microsoft.netcore.app.ref.10.0.8.nupkg.sha512",
+    "C:\\Users\\kenan\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\10.0.8\\microsoft.windowsdesktop.app.ref.10.0.8.nupkg.sha512",
+    "C:\\Users\\kenan\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\10.0.8\\microsoft.aspnetcore.app.ref.10.0.8.nupkg.sha512"
+  ],
+  "logs": []
+}

@@ -1,0 +1,29 @@
+{
+  "Author": "Kenan",
+  "Name": "FF14 Player2 TTS",
+  "InternalName": "FF14P2TTS",
+  "AssemblyVersion": "1.0.0.9",
+  "Description": "Connects to Player2 TTS API or Microsoft Azure Cognitive Services to read incoming FFXIV chat messages aloud. Supports filtering by chat channel, custom voices per engine, gendered/per-NPC voices, and volume/speed control. Now includes a Botanist auto-farming tab that uses VNavMesh to navigate to gathering nodes. Use /p2tts to configure.",
+  "ApplicableVersion": "any",
+  "RepoUrl": "https://github.com/kenan/FF14P2TTS",
+  "Tags": [
+    "tts",
+    "text-to-speech",
+    "player2",
+    "azure",
+    "chat",
+    "voice",
+    "accessibility",
+    "botany",
+    "gathering",
+    "auto-farm"
+  ],
+  "DalamudApiLevel": 15,
+  "LoadRequiredState": 0,
+  "LoadSync": false,
+  "CanUnloadAsync": false,
+  "LoadPriority": 0,
+  "IconUrl": "",
+  "Punchline": "Text-to-Speech for FFXIV chat (Player2 & Azure) + Botanist Auto-Farm",
+  "AcceptsFeedback": true
+}
