@@ -92,3 +92,4 @@ C:\Users\kenan\Desktop\Kenan\ff14p2tts\FF14P2TTS\obj\Release\FF14P2TTS.AssemblyI
 C:\Users\kenan\Desktop\Kenan\ff14p2tts\FF14P2TTS\obj\Release\FF14P2TTS.csproj.CoreCompileInputs.cache
 C:\Users\kenan\Desktop\Kenan\ff14p2tts\FF14P2TTS\obj\Release\FF14P2TTS.csproj.Up2Date
 C:\Users\kenan\Desktop\Kenan\ff14p2tts\FF14P2TTS\obj\Release\FF14P2TTS.dll
+C:\Users\kenan\Desktop\Kenan\ff14p2tts\FF14P2TTS\obj\Release\FF14P2TTS.sourcelink.json

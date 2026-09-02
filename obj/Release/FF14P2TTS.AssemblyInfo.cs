@@ -10,15 +10,14 @@
 using System;
 using System.Reflection;
 
-[assembly: System.Reflection.AssemblyCompanyAttribute("Kenan")]
+[assembly: System.Reflection.AssemblyCompanyAttribute("FF14P2TTS")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
-[assembly: System.Reflection.AssemblyDescriptionAttribute(@"Connects to Player2 TTS API or Microsoft Azure Cognitive Services to read incoming FFXIV chat messages aloud. Supports filtering by chat channel, custom voices per engine, gendered/per-NPC voices, and volume/speed control. Now includes a Botanist auto-farming tab that uses VNavMesh to navigate to gathering nodes. Use /p2tts to configure.")]
-[assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.9")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0.9")]
+[assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.10")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0.10+9dc672701c02aa6c8876b91d464c5b10fdffe651")]
 [assembly: System.Reflection.AssemblyProductAttribute("FF14P2TTS")]
 [assembly: System.Reflection.AssemblyTitleAttribute("FF14P2TTS")]
-[assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.9")]
-[assembly: System.Reflection.AssemblyMetadataAttribute("RepositoryUrl", "")]
+[assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.10")]
+[assembly: System.Reflection.AssemblyMetadataAttribute("RepositoryUrl", "https://github.com/Kenan125/FF14P2TTS.git")]
 [assembly: System.Runtime.Versioning.TargetPlatformAttribute("Windows7.0")]
 [assembly: System.Runtime.Versioning.SupportedOSPlatformAttribute("Windows7.0")]
 
