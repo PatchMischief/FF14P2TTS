@@ -6,25 +6,22 @@ namespace FF14P2TTS;
 
 public enum NpcGender { Unknown, Male, Female }
 
-/// <summary>
-/// Assigns a unique voice to each NPC by name, persisted in config.
-/// Supports both Player2 (UUID-based) and Azure (voice-name-based) engines.
-/// </summary>
 public class NpcVoiceMapper
 {
     private readonly Configuration _config;
     private readonly Random _rng = new();
+    
+    // Tracks the shuffled remaining voices. Keyed by (IsAzure, Gender).
+    private readonly Dictionary<(bool, NpcGender), Queue<string>> _shuffleBags = new();
 
     public NpcVoiceMapper(Configuration config)
     {
         _config = config;
     }
 
-    /// <summary>
-    /// Get the voice ID for a given NPC based on the active TTS engine.
-    /// </summary>
     public string GetVoiceForNpc(string npcName, NpcGender gender, List<VoiceInfo> availableVoices)
     {
+        // Restored your original correct enum check
         if (_config.ActiveEngine == TtsEngine.MicrosoftAzure)
             return GetAzureVoiceForNpc(npcName, gender, availableVoices);
         else
@@ -43,29 +40,15 @@ public class NpcVoiceMapper
             };
         }
 
-        // Check cache
         if (_config.NpcVoiceAssignments.TryGetValue(npcName, out var cached))
             return cached;
 
-        // Pick a new voice from the appropriate gender pool
-        var pool = gender switch
-        {
-            NpcGender.Male => availableVoices.Where(v =>
-                string.Equals(v.Gender, "male", StringComparison.OrdinalIgnoreCase)).ToList(),
-            NpcGender.Female => availableVoices.Where(v =>
-                string.Equals(v.Gender, "female", StringComparison.OrdinalIgnoreCase)).ToList(),
-            _ => availableVoices
-        };
-
-        if (pool.Count == 0)
-            pool = availableVoices; // fallback to all voices
-
-        var selected = pool[_rng.Next(pool.Count)];
-
-        _config.NpcVoiceAssignments[npcName] = selected.Id;
+        string selectedId = DrawVoiceFromBag(false, gender, availableVoices);
+        
+        _config.NpcVoiceAssignments[npcName] = selectedId;
         _config.Save();
 
-        return selected.Id;
+        return selectedId;
     }
 
     private string GetAzureVoiceForNpc(string npcName, NpcGender gender, List<VoiceInfo> availableVoices)
@@ -80,28 +63,46 @@ public class NpcVoiceMapper
             };
         }
 
-        // Check cache
         if (_config.AzureNpcVoiceAssignments.TryGetValue(npcName, out var cached))
             return cached;
 
-        // Pick a new voice from the appropriate gender pool
-        var pool = gender switch
-        {
-            NpcGender.Male => availableVoices.Where(v =>
-                string.Equals(v.Gender, "male", StringComparison.OrdinalIgnoreCase)).ToList(),
-            NpcGender.Female => availableVoices.Where(v =>
-                string.Equals(v.Gender, "female", StringComparison.OrdinalIgnoreCase)).ToList(),
-            _ => availableVoices
-        };
-
-        if (pool.Count == 0)
-            pool = availableVoices; // fallback to all voices
-
-        var selected = pool[_rng.Next(pool.Count)];
-
-        _config.AzureNpcVoiceAssignments[npcName] = selected.Id;
+        string selectedId = DrawVoiceFromBag(true, gender, availableVoices);
+        
+        _config.AzureNpcVoiceAssignments[npcName] = selectedId;
         _config.Save();
 
-        return selected.Id;
+        return selectedId;
+    }
+
+    private string DrawVoiceFromBag(bool isAzure, NpcGender gender, List<VoiceInfo> availableVoices)
+    {
+        var key = (isAzure, gender);
+
+        if (!_shuffleBags.TryGetValue(key, out var bag) || bag.Count == 0)
+        {
+            var pool = gender switch
+            {
+                NpcGender.Male => availableVoices.Where(v => string.Equals(v.Gender, "male", StringComparison.OrdinalIgnoreCase)).ToList(),
+                NpcGender.Female => availableVoices.Where(v => string.Equals(v.Gender, "female", StringComparison.OrdinalIgnoreCase)).ToList(),
+                _ => availableVoices.ToList()
+            };
+
+            if (pool.Count == 0)
+                pool = availableVoices.ToList(); // fallback to all voices
+
+            // Fisher-Yates Shuffle
+            int n = pool.Count;
+            while (n > 1)
+            {
+                n--;
+                int k = _rng.Next(n + 1);
+                (pool[k], pool[n]) = (pool[n], pool[k]);
+            }
+
+            bag = new Queue<string>(pool.Select(v => v.Id));
+            _shuffleBags[key] = bag;
+        }
+
+        return bag.Dequeue();
     }
 }

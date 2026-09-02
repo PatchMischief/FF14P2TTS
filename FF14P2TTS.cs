@@ -25,6 +25,9 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IGameGui GameGui { get; private set; } = null!;
     [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
+    [PluginService] internal static INotificationManager NotificationManager { get; private set; } = null!;
+    [PluginService] internal static ICondition Condition { get; private set; } = null!;
+    [PluginService] internal static IFramework Framework { get; private set; } = null!;
 
     private const string CommandName = "/p2tts";
 
@@ -38,6 +41,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly NpcVoiceMapper _npcVoiceMapper;
     private ConfigWindow ConfigWindow { get; init; }
     private MainWindow MainWindow { get; init; }
+    private readonly DialogueTester _dialogueTester;
 
     public Plugin()
     {
@@ -117,6 +121,7 @@ public sealed class Plugin : IDalamudPlugin
 
         var engineName = Configuration.ActiveEngine == TtsEngine.MicrosoftAzure ? "Azure" : "Player2";
         Log.Information($"[FF14P2TTS] Plugin loaded. Engine: {engineName}");
+        _dialogueTester = new DialogueTester(AddonLifecycle, NotificationManager, Condition);
     }
 
     public void Dispose()
@@ -131,10 +136,12 @@ public sealed class Plugin : IDalamudPlugin
 
         WindowSystem.RemoveAllWindows();
         ConfigWindow.Dispose();
+        _dialogueTester.Dispose();
         MainWindow.Dispose();
         Player2Service.Dispose();
         AzureService.Dispose();
         CommandManager.RemoveHandler(CommandName);
+        ChatGui.ChatMessageUnhandled -= OnChatMessage;
     }
 
     private void OnCommand(string command, string args)
@@ -299,14 +306,12 @@ public sealed class Plugin : IDalamudPlugin
     {
         if (!Configuration.TtsEnabled) return;
 
-        // Skip TTS during voiced cutscenes (CutScene addon is active and visible)
-        if (Configuration.SkipTtsDuringCutscenes)
+        // TalkSubtitle is visible only while the game presents native spoken subtitles.
+        // It is line-level state, so unvoiced cutscene dialogue remains eligible for TTS.
+        if (Configuration.SkipTtsDuringCutscenes && _dialogueTester.IsNativeVoiceSubtitleVisible)
         {
-            if (IsCutSceneActive())
-            {
-                Log.Debug("[FF14P2TTS] CutScene active — skipping TTS (voiced cutscene)");
-                return;
-            }
+            Log.Debug("[FF14P2TTS] Native voice subtitle visible — skipping NPC TTS");
+            return;
         }
 
         // Prepend speaker name if enabled and different from last speaker
@@ -475,45 +480,6 @@ public sealed class Plugin : IDalamudPlugin
             57 => "system",
             _ => null
         };
-    }
-
-    /// <summary>
-    /// Check if a cutscene is currently active and visible.
-    /// Uses pointer-based visibility check to avoid false positives from hidden/dormant addons.
-    /// </summary>
-    private unsafe bool IsCutSceneActive()
-    {
-        try
-        {
-            // Check "CutScene" addon at index 1 (primary instance)
-            var addon1 = GameGui.GetAddonByName("CutScene", 1);
-            if (addon1 != nint.Zero && addon1.Address != nint.Zero)
-            {
-                var ptr = (FFXIVClientStructs.FFXIV.Component.GUI.AtkUnitBase*)addon1.Address;
-                if (ptr->IsVisible)
-                    return true;
-            }
-
-            // Fallback: check index 2 (some cutscenes use a secondary instance)
-            var addon2 = GameGui.GetAddonByName("CutScene", 2);
-            if (addon2 != nint.Zero && addon2.Address != nint.Zero)
-            {
-                var ptr = (FFXIVClientStructs.FFXIV.Component.GUI.AtkUnitBase*)addon2.Address;
-                if (ptr->IsVisible)
-                    return true;
-            }
-        }
-        catch
-        {
-            // Fallback: simple pointer check without visibility
-            try
-            {
-                if (GameGui.GetAddonByName("CutScene", 1) != nint.Zero)
-                    return true;
-            }
-            catch { /* best-effort */ }
-        }
-        return false;
     }
 
     private void PrintChat(string message)
