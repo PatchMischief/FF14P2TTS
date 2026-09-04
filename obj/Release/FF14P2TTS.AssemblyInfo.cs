@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("FF14P2TTS")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.10")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0.10+9dc672701c02aa6c8876b91d464c5b10fdffe651")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0.10+c7dec54fada4a83a74bd03e7b990e49a5cdb5cda")]
 [assembly: System.Reflection.AssemblyProductAttribute("FF14P2TTS")]
 [assembly: System.Reflection.AssemblyTitleAttribute("FF14P2TTS")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.10")]
