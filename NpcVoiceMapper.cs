@@ -40,8 +40,11 @@ public class NpcVoiceMapper
             };
         }
 
-        if (_config.NpcVoiceAssignments.TryGetValue(npcName, out var cached))
+        if (_config.NpcVoiceAssignments.TryGetValue(npcName, out var cached)
+            && IsVoiceCompatible(cached, gender, availableVoices))
             return cached;
+
+        _config.NpcVoiceAssignments.Remove(npcName);
 
         string selectedId = DrawVoiceFromBag(false, gender, availableVoices);
         
@@ -63,8 +66,11 @@ public class NpcVoiceMapper
             };
         }
 
-        if (_config.AzureNpcVoiceAssignments.TryGetValue(npcName, out var cached))
+        if (_config.AzureNpcVoiceAssignments.TryGetValue(npcName, out var cached)
+            && IsVoiceCompatible(cached, gender, availableVoices))
             return cached;
+
+        _config.AzureNpcVoiceAssignments.Remove(npcName);
 
         string selectedId = DrawVoiceFromBag(true, gender, availableVoices);
         
@@ -104,5 +110,22 @@ public class NpcVoiceMapper
         }
 
         return bag.Dequeue();
+    }
+
+    private static bool IsVoiceCompatible(string voiceId, NpcGender gender, List<VoiceInfo> availableVoices)
+    {
+        if (gender == NpcGender.Unknown)
+            return true;
+
+        var voice = availableVoices.FirstOrDefault(v =>
+            string.Equals(v.Id, voiceId, StringComparison.OrdinalIgnoreCase));
+
+        // If the backend did not provide metadata for this custom voice, keep
+        // the persisted assignment rather than guessing from its name.
+        if (voice is null || string.IsNullOrWhiteSpace(voice.Gender))
+            return true;
+
+        return string.Equals(voice.Gender, gender == NpcGender.Male ? "male" : "female",
+            StringComparison.OrdinalIgnoreCase);
     }
 }
