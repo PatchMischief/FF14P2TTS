@@ -388,8 +388,10 @@ public sealed class Plugin : IDalamudPlugin
                 if (string.Equals(row.Singular.ExtractText(), speakerName, StringComparison.OrdinalIgnoreCase))
                 {
                     var baseRow = bases.GetRow(row.RowId);
-                    var gender = baseRow.Gender == 1 ? NpcGender.Female :
-                                 baseRow.Gender == 0 ? NpcGender.Male : NpcGender.Unknown;
+                    // ENpcBase.Gender uses 1 = male and 2 = female. Zero and
+                    // other values are non-gendered/unknown NPC representations.
+                    var gender = baseRow.Gender == 1 ? NpcGender.Male :
+                                 baseRow.Gender == 2 ? NpcGender.Female : NpcGender.Unknown;
 
                     _genderCache[speakerName] = gender;
                     Log.Debug($"[FF14P2TTS] Sheet: '{speakerName}' → {gender}");
