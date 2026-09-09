@@ -26,7 +26,6 @@ public class NpcTalkHandler : IDisposable
         _config = config;
 
         _addonLifecycle.RegisterListener(AddonEvent.PostUpdate, "Talk", OnTalkUpdate);
-        _addonLifecycle.RegisterListener(AddonEvent.PostUpdate, "Talk", OnTalkUpdate);
         _addonLifecycle.RegisterListener(AddonEvent.PostUpdate, "BattleTalk", OnBattleTalkUpdate);
         _log.Information("[FF14P2TTS] NPC talk handlers registered");
     }

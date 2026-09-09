@@ -2,10 +2,11 @@ using System;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Dalamud.Plugin.Services;
+using FF14P2TTS.Application;
 
 namespace FF14P2TTS;
 
-public class AutoAdvanceHandler : IDisposable
+public class AutoAdvanceHandler : IDisposable, IAutoAdvanceHandler
 {
     private readonly Configuration _config;
     private readonly IPluginLog _log;

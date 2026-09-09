@@ -4,13 +4,13 @@ using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
+using FF14P2TTS.Application;
+using FF14P2TTS.Infrastructure;
 using FF14P2TTS.Windows;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Lumina.Excel.Sheets;
 
 namespace FF14P2TTS;
 
@@ -35,10 +35,13 @@ public sealed class Plugin : IDalamudPlugin
     public readonly WindowSystem WindowSystem = new("FF14P2TTS");
     internal readonly Player2TtsService Player2Service;
     internal readonly AzureTtsService AzureService;
-    internal ITtsService ActiveTtsService => Configuration.ActiveEngine == TtsEngine.MicrosoftAzure ? AzureService : Player2Service;
+    private readonly ITtsServiceProvider _ttsServices;
+    internal ITtsService ActiveTtsService => _ttsServices.Active;
     private readonly NpcTalkHandler _npcTalkHandler;
     private readonly AutoAdvanceHandler _autoAdvanceHandler;
-    private readonly NpcVoiceMapper _npcVoiceMapper;
+    private readonly ChatSpeechCoordinator _chatSpeechCoordinator;
+    private readonly NpcDialogueCoordinator _npcDialogueCoordinator;
+    private readonly INpcGenderResolver _npcGenderResolver;
     private ConfigWindow ConfigWindow { get; init; }
     private MainWindow MainWindow { get; init; }
     private readonly DialogueTester _dialogueTester;
@@ -89,6 +92,9 @@ public sealed class Plugin : IDalamudPlugin
         Player2Service = new Player2TtsService(Configuration, Log);
         AzureService = new AzureTtsService(Configuration, Log);
 
+        _ttsServices = new TtsServiceProvider(Configuration, Player2Service, AzureService);
+        _chatSpeechCoordinator = new ChatSpeechCoordinator(Configuration, _ttsServices);
+
         // Initialize NPC talk handler
         _npcTalkHandler = new NpcTalkHandler(AddonLifecycle, Log, Configuration);
         _npcTalkHandler.OnNpcTalk += OnNpcTalk;
@@ -96,8 +102,14 @@ public sealed class Plugin : IDalamudPlugin
         // Initialize auto-advance handler
         _autoAdvanceHandler = new AutoAdvanceHandler(Configuration, Log, GameGui);
 
-        // Initialize NPC voice mapper
-        _npcVoiceMapper = new NpcVoiceMapper(Configuration);
+        _npcGenderResolver = new DalamudNpcGenderResolver(DataManager, Log, Configuration);
+        _npcDialogueCoordinator = new NpcDialogueCoordinator(
+            Configuration,
+            _ttsServices,
+            new NpcVoiceMapper(Configuration),
+            _npcGenderResolver,
+            _autoAdvanceHandler,
+            Log);
 
         // Create windows
         ConfigWindow = new ConfigWindow(this);
@@ -248,58 +260,27 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnChatMessage(IChatMessage msg)
     {
-        if (!Configuration.TtsEnabled)
-            return;
-
-        // Don't read messages in PvP areas by default
-        if (ClientState.IsPvPExcludingDen)
-            return;
-
         var chatType = (int)msg.LogKind;
-        var shouldRead = ShouldReadChatType(chatType);
-
-        if (!shouldRead)
-            return;
-
         var senderName = msg.Sender.TextValue;
         var messageText = msg.Message.TextValue;
 
-        // Skip empty messages
-        if (string.IsNullOrWhiteSpace(messageText))
-            return;
+        var localPlayer = ObjectTable.LocalPlayer;
+        var isOwnMessage = !Configuration.ReadOwnMessages
+            && localPlayer is not null
+            && senderName == localPlayer.Name.TextValue;
 
-        // Skip messages from self (unless user enabled reading own messages)
-        if (!Configuration.ReadOwnMessages)
-        {
-            var localPlayer = ObjectTable.LocalPlayer;
-            if (localPlayer != null && senderName == localPlayer.Name.TextValue)
-                return;
-        }
-
-        // Build the text to speak
-        string textToSpeak;
-        if (Configuration.IncludeSpeakerName)
-        {
-            textToSpeak = string.Format(Configuration.SpeakerNameFormat, senderName, messageText);
-        }
-        else
-        {
-            textToSpeak = messageText;
-        }
-
-        // Check for voice override for this channel
-        var channelKey = GetChannelKey(chatType);
-        string? voiceOverride = null;
-        if (channelKey != null && Configuration.ChannelVoiceOverrides.TryGetValue(channelKey, out var overrideVoice))
-        {
-            voiceOverride = overrideVoice;
-        }
-
-        // Fire and forget - don't block the chat pipeline
-        _ = ActiveTtsService.SpeakAsync(textToSpeak, voice: voiceOverride);
-        Log.Debug($"[FF14P2TTS] Queued TTS: {textToSpeak}");
+        if (_chatSpeechCoordinator.TrySpeak(chatType, senderName, messageText, ClientState.IsPvPExcludingDen, isOwnMessage))
+            Log.Debug($"[FF14P2TTS] Queued TTS: {messageText}");
     }
 
+    private void OnNpcTalk(string speaker, string text)
+    {
+        _npcDialogueCoordinator.Handle(speaker, text, _dialogueTester.IsNativeVoiceSubtitleVisible);
+    }
+
+    internal NpcGender GetNpcGender(string speakerName) => _npcGenderResolver.GetGender(speakerName);
+
+#if false // Superseded by Application/NpcDialogueCoordinator.
     private string _lastNpcSpeaker = string.Empty;
 
     private void OnNpcTalk(string speaker, string text)
@@ -481,6 +462,8 @@ public sealed class Plugin : IDalamudPlugin
             _ => null
         };
     }
+
+ #endif
 
     private void PrintChat(string message)
     {

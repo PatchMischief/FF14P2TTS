@@ -4,10 +4,10 @@ using System.Linq;
 
 namespace FF14P2TTS;
 
-public enum NpcGender { Unknown, Male, Female }
-
 public class NpcVoiceMapper
 {
+    private const string AzureAnaVoiceId = "en-US-AnaNeural";
+    private const string AzureFallbackFemaleVoiceId = "en-US-JennyNeural";
     private readonly Configuration _config;
     private readonly Random _rng = new();
     
@@ -30,6 +30,9 @@ public class NpcVoiceMapper
 
     private string GetPlayer2VoiceForNpc(string npcName, NpcGender gender, List<VoiceInfo> availableVoices)
     {
+        if (gender == NpcGender.Unknown)
+            return _config.UnisexVoiceId;
+
         if (!_config.UsePerNpcVoices)
         {
             return gender switch
@@ -40,8 +43,11 @@ public class NpcVoiceMapper
             };
         }
 
-        if (_config.NpcVoiceAssignments.TryGetValue(npcName, out var cached))
+        if (_config.NpcVoiceAssignments.TryGetValue(npcName, out var cached)
+            && IsCompatibleWithGender(cached, gender, availableVoices, isAzure: false))
             return cached;
+
+        _config.NpcVoiceAssignments.Remove(npcName);
 
         string selectedId = DrawVoiceFromBag(false, gender, availableVoices);
         
@@ -53,18 +59,24 @@ public class NpcVoiceMapper
 
     private string GetAzureVoiceForNpc(string npcName, NpcGender gender, List<VoiceInfo> availableVoices)
     {
+        if (gender == NpcGender.Unknown)
+            return _config.AzureUnisexVoice;
+
         if (!_config.AzureUsePerNpcVoices)
         {
             return gender switch
             {
                 NpcGender.Male => _config.AzureMaleVoice,
-                NpcGender.Female => _config.AzureFemaleVoice,
+                NpcGender.Female => GetAzureFemaleDefaultVoice(),
                 _ => _config.AzureUnisexVoice
             };
         }
 
-        if (_config.AzureNpcVoiceAssignments.TryGetValue(npcName, out var cached))
+        if (_config.AzureNpcVoiceAssignments.TryGetValue(npcName, out var cached)
+            && IsCompatibleWithGender(cached, gender, availableVoices, isAzure: true))
             return cached;
+
+        _config.AzureNpcVoiceAssignments.Remove(npcName);
 
         string selectedId = DrawVoiceFromBag(true, gender, availableVoices);
         
@@ -83,7 +95,10 @@ public class NpcVoiceMapper
             var pool = gender switch
             {
                 NpcGender.Male => availableVoices.Where(v => string.Equals(v.Gender, "male", StringComparison.OrdinalIgnoreCase)).ToList(),
-                NpcGender.Female => availableVoices.Where(v => string.Equals(v.Gender, "female", StringComparison.OrdinalIgnoreCase)).ToList(),
+                NpcGender.Female => availableVoices
+                    .Where(v => string.Equals(v.Gender, "female", StringComparison.OrdinalIgnoreCase)
+                                && (!isAzure || !string.Equals(v.Id, AzureAnaVoiceId, StringComparison.OrdinalIgnoreCase)))
+                    .ToList(),
                 _ => availableVoices.ToList()
             };
 
@@ -104,5 +119,29 @@ public class NpcVoiceMapper
         }
 
         return bag.Dequeue();
+    }
+
+    private string GetAzureFemaleDefaultVoice() => string.Equals(
+        _config.AzureFemaleVoice,
+        AzureAnaVoiceId,
+        StringComparison.OrdinalIgnoreCase)
+        ? AzureFallbackFemaleVoiceId
+        : _config.AzureFemaleVoice;
+
+    private static bool IsCompatibleWithGender(
+        string voiceId,
+        NpcGender gender,
+        IEnumerable<VoiceInfo> availableVoices,
+        bool isAzure)
+    {
+        if (isAzure && gender == NpcGender.Female
+            && string.Equals(voiceId, AzureAnaVoiceId, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var voice = availableVoices.FirstOrDefault(candidate =>
+            string.Equals(candidate.Id, voiceId, StringComparison.OrdinalIgnoreCase));
+
+        return voice is not null
+            && string.Equals(voice.Gender, gender == NpcGender.Male ? "male" : "female", StringComparison.OrdinalIgnoreCase);
     }
 }

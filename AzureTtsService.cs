@@ -103,10 +103,10 @@ public class AzureTtsService : ITtsService
         return true; // Azure is cloud-based; we can't easily ping without making a call
     }
 
-    public Task<string[]> GetAvailableVoicesAsync(CancellationToken ct = default)
+    public async Task<string[]> GetAvailableVoicesAsync(CancellationToken ct = default)
     {
-        var voices = GetAvailableVoicesRawAsync(ct).Result;
-        return Task.FromResult(voices.Select(v => v.DisplayName).ToArray());
+        var voices = await GetAvailableVoicesRawAsync(ct).ConfigureAwait(false);
+        return voices.Select(v => v.DisplayName).ToArray();
     }
 
     public Task<List<VoiceInfo>> GetAvailableVoicesRawAsync(CancellationToken ct = default)

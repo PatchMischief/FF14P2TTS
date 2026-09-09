@@ -20,6 +20,8 @@ public class ConfigWindow : Window, IDisposable
     private List<VoiceInfo>? _cachedPlayer2Voices;
     private List<VoiceInfo>? _cachedAzureVoices;
     private bool _voicesFetched;
+    private string _npcGenderOverrideName = string.Empty;
+    private int _npcGenderOverrideIndex;
 
     public ConfigWindow(Plugin plugin) : base(
         "Player2 TTS Configuration###FF14P2TTSConfig",
@@ -307,6 +309,23 @@ public class ConfigWindow : Window, IDisposable
         ImGui.Separator(); ImGui.Text("Assigned NPC Voices");
         ImGui.TextWrapped("View and change voices assigned to NPCs you've encountered. Voices are auto-assigned the first time an NPC speaks.");
 
+        ImGui.Text("Correct NPC gender:");
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth(180);
+        ImGui.InputText("##npcGenderOverrideName", ref _npcGenderOverrideName, 128);
+        ImGui.SameLine();
+        var overrideLabels = new[] { "Male", "Female" };
+        ImGui.SetNextItemWidth(85);
+        ImGui.Combo("##npcGenderOverrideValue", ref _npcGenderOverrideIndex, overrideLabels, overrideLabels.Length);
+        ImGui.SameLine();
+        if (ImGui.SmallButton("Save gender") && !string.IsNullOrWhiteSpace(_npcGenderOverrideName))
+        {
+            _configuration.NpcGenderOverrides[_npcGenderOverrideName.Trim()] = _npcGenderOverrideIndex == 0
+                ? NpcGender.Male
+                : NpcGender.Female;
+            _configuration.Save();
+        }
+
         if (assignments.Count == 0)
         {
             ImGui.Spacing();
@@ -385,7 +404,8 @@ public class ConfigWindow : Window, IDisposable
             var voicesForNpc = gender switch
             {
                 NpcGender.Male => enVoices.Where(v => string.Equals(v.Gender, "male", StringComparison.OrdinalIgnoreCase)).ToList(),
-                NpcGender.Female => enVoices.Where(v => string.Equals(v.Gender, "female", StringComparison.OrdinalIgnoreCase)).ToList(),
+                NpcGender.Female => enVoices.Where(v => string.Equals(v.Gender, "female", StringComparison.OrdinalIgnoreCase)
+                                                        && (!isAzure || !string.Equals(v.Id, "en-US-AnaNeural", StringComparison.OrdinalIgnoreCase))).ToList(),
                 _ => enVoices
             };
             if (voicesForNpc.Count == 0) voicesForNpc = enVoices;
@@ -621,7 +641,8 @@ public class ConfigWindow : Window, IDisposable
                 .Where(v => string.Equals(v.Gender, "male", StringComparison.OrdinalIgnoreCase))
                 .ToList();
             var femaleVoices = enVoices
-                .Where(v => string.Equals(v.Gender, "female", StringComparison.OrdinalIgnoreCase))
+                .Where(v => string.Equals(v.Gender, "female", StringComparison.OrdinalIgnoreCase)
+                            && (!isAzure || !string.Equals(v.Id, "en-US-AnaNeural", StringComparison.OrdinalIgnoreCase)))
                 .ToList();
 
             ImGui.Text($"Loaded {enVoices.Count} English voices ({maleVoices.Count} male, {femaleVoices.Count} female)");

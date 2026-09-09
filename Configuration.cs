@@ -43,6 +43,7 @@ public class Configuration : IPluginConfiguration
     public bool AzureUseGenderedVoices { get; set; } = true;
     public bool AzureUsePerNpcVoices { get; set; } = true;
     public Dictionary<string, string> AzureNpcVoiceAssignments { get; set; } = new(); // NPC name -> Azure voice name
+    public Dictionary<string, NpcGender> NpcGenderOverrides { get; set; } = new(); // displayed NPC name -> verified gender
 
     // NPC dialog
     public bool ReadNpcTalk { get; set; } = true;
