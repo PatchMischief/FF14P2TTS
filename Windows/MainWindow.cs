@@ -19,7 +19,7 @@ public class MainWindow : Window, IDisposable
     private bool _isChecking;
 
     public MainWindow(Plugin plugin) : base(
-        "Player2 TTS Control###FF14P2TTSMain",
+        "FF14 TTS Control###FF14TTSMain",
         ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse)
     {
         Size = new Vector2(350, 280);
@@ -42,7 +42,13 @@ public class MainWindow : Window, IDisposable
         ImGui.TextColored(enabledColor, enabledText);
 
         // Engine indicator
-        var engineName = _configuration.ActiveEngine == TtsEngine.MicrosoftAzure ? "Microsoft Azure" : "Player2";
+        var engineName = _configuration.ActiveEngine switch
+        {
+            TtsEngine.MicrosoftAzure => "Microsoft Azure",
+            TtsEngine.ElevenLabs => "ElevenLabs",
+            TtsEngine.Speechify => "Speechify",
+            _ => "Player2",
+        };
         ImGui.SameLine();
         ImGui.TextColored(new Vector4(0.4f, 0.7f, 1, 1), $"[{engineName}]");
 
@@ -91,27 +97,41 @@ public class MainWindow : Window, IDisposable
         if (_configuration.ActiveEngine == TtsEngine.Player2)
         {
             ImGui.Text($"Player2 URL: {_configuration.Player2BaseUrl}");
-            ImGui.Text($"Voice: {(_configuration.DefaultVoice.Length > 0 ? _configuration.DefaultVoice : "preset-based")}");
+            var voiceLabel = _configuration.DefaultVoice.Length > 0
+                ? _configuration.DefaultVoice
+                : "preset-based";
+            ImGui.Text($"Voice: {voiceLabel}");
         }
-        else
+        else if (_configuration.ActiveEngine == TtsEngine.MicrosoftAzure)
         {
             ImGui.Text($"Azure Region: {_configuration.AzureRegion}");
             ImGui.Text($"Voice: {_configuration.AzureDefaultVoice}");
         }
+        else if (_configuration.ActiveEngine == TtsEngine.ElevenLabs)
+        {
+            ImGui.Text($"ElevenLabs URL: {_configuration.ElevenLabsBaseUrl}");
+            ImGui.Text($"Voice: {_configuration.ElevenLabsDefaultVoice}");
+        }
+        else
+        {
+            ImGui.Text($"Speechify URL: {_configuration.SpeechifyBaseUrl}");
+            ImGui.Text($"Voice: {_configuration.SpeechifyDefaultVoice}");
+        }
         ImGui.Text($"Volume: {_configuration.Volume}% | Speed: {_configuration.Speed:F1}x");
-        ImGui.Text($"NPC Talk: {(_configuration.ReadNpcTalk ? "ON" : "OFF")} | Own chat: {(_configuration.ReadOwnMessages ? "ON" : "OFF")}");
+        ImGui.Text($"NPC Talk: {(_configuration.ReadNpcTalk ? "ON" : "OFF")}");
 
         ImGui.Spacing();
         ImGui.Separator(); ImGui.Text("Chat Commands");
 
-        ImGui.BulletText("/p2tts on - Enable TTS");
-        ImGui.BulletText("/p2tts off - Disable TTS");
-        ImGui.BulletText("/p2tts toggle - Toggle TTS");
-        ImGui.BulletText("/p2tts status - Check server status");
-        ImGui.BulletText("/p2tts test <msg> - Speak a test message");
-        ImGui.BulletText("/p2tts voice <name> - Change voice");
-        ImGui.BulletText("/p2tts engine <player2|azure> - Switch engine");
-        ImGui.BulletText("/p2tts config - Open settings");
+        ImGui.BulletText("/ff14tts on - Enable TTS");
+        ImGui.BulletText("/ff14tts off - Disable TTS");
+        ImGui.BulletText("/ff14tts toggle - Toggle TTS");
+        ImGui.BulletText("/ff14tts status - Check server status");
+        ImGui.BulletText("/ff14tts quests - Show active quests");
+        ImGui.BulletText("/ff14tts test <msg> - Speak a test message");
+        ImGui.BulletText("/ff14tts voice <name> - Change voice");
+        ImGui.BulletText("/ff14tts engine <player2|azure|elevenlabs|speechify> - Switch engine");
+        ImGui.BulletText("/ff14tts config - Open settings");
     }
 
     private async Task CheckServerStatusAsync()
@@ -122,7 +142,12 @@ public class MainWindow : Window, IDisposable
 
         try
         {
-            var engineName = _configuration.ActiveEngine == TtsEngine.MicrosoftAzure ? "Azure" : "Player2";
+            var engineName = _configuration.ActiveEngine switch
+            {
+                TtsEngine.MicrosoftAzure => "Azure",
+                TtsEngine.ElevenLabs => "ElevenLabs",
+                _ => "Player2",
+            };
             var available = await _plugin.ActiveTtsService.IsServerAvailableAsync();
             if (available)
             {

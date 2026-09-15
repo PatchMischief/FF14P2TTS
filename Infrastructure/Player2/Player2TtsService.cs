@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -9,7 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Plugin.Services;
 
-namespace FF14P2TTS;
+namespace FF14P2TTS.Infrastructure.Player2;
 
 /// <summary>
 /// HTTP client for the Player2 TTS API (player2.game by Elefant AI).
@@ -24,8 +23,7 @@ public class Player2TtsService : ITtsService
     private readonly HttpClient _httpClient;
     private readonly IPluginLog _log;
     private readonly Configuration _config;
-    private string _lastMessage = string.Empty;
-    private DateTime _lastMessageTime = DateTime.MinValue;
+    private readonly DuplicateMessageFilter _duplicateFilter = new();
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -61,15 +59,6 @@ public class Player2TtsService : ITtsService
                 _log.Debug($"[FF14P2TTS] Server check failed: {ex.Message}");
             return false;
         }
-    }
-
-    /// <summary>
-    /// Get list of available voices from Player2.
-    /// </summary>
-    public async Task<string[]> GetAvailableVoicesAsync(CancellationToken ct = default)
-    {
-        var raw = await GetAvailableVoicesRawAsync(ct).ConfigureAwait(false);
-        return raw.Select(v => $"{v.Name} ({v.Language})").ToArray();
     }
 
     /// <summary>
@@ -149,19 +138,21 @@ public class Player2TtsService : ITtsService
     /// <summary>
     /// Speak a message through Player2 TTS using the configured settings.
     /// </summary>
-    public async Task SpeakAsync(string text, string? voice = null, double? speed = null, int? pitch = null, int? volume = null, CancellationToken ct = default)
+    public async Task SpeakAsync(
+        string text,
+        string? voice = null,
+        double? speed = null,
+        int? pitch = null,
+        int? volume = null,
+        CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(text))
             return;
 
         text = SanitizeText(text);
 
-        // Skip duplicate messages within 2 seconds
-        if (_config.SkipDuplicateMessages && text == _lastMessage && (DateTime.UtcNow - _lastMessageTime).TotalSeconds < 2)
+        if (_config.SkipDuplicateMessages && _duplicateFilter.ShouldSkip(text))
             return;
-
-        _lastMessage = text;
-        _lastMessageTime = DateTime.UtcNow;
 
         var selectedSpeed = speed ?? _config.Speed;
 
@@ -260,25 +251,6 @@ internal class TtsSpeakRequest
     [JsonPropertyName("voice_ids")]
     public string[]? VoiceIds { get; set; }
 
-    [JsonPropertyName("voice_gender")]
-    public string? VoiceGender { get; set; }
-
-    [JsonPropertyName("voice_language")]
-    public string? VoiceLanguage { get; set; }
-
     [JsonPropertyName("volume")]
     public double? Volume { get; set; }
-}
-
-/// <summary>
-/// Voice information from Player2 /v1/tts/voices response.
-/// </summary>
-public class VoiceInfo
-{
-    public string Id { get; set; } = "";
-    public string Name { get; set; } = "";
-    public string RawLanguage { get; set; } = "";  // "american_english"
-    public string Language { get; set; } = "";     // "EN-US"
-    public string Gender { get; set; } = "";
-    public string DisplayName { get; set; } = "";
 }

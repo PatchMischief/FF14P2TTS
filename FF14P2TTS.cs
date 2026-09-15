@@ -1,4 +1,3 @@
-using Dalamud.Game.Chat;
 using Dalamud.Game.Command;
 using Dalamud.IoC;
 using Dalamud.Plugin;
@@ -6,6 +5,8 @@ using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
 using FF14P2TTS.Application;
 using FF14P2TTS.Infrastructure;
+using FF14P2TTS.Infrastructure.Groq;
+using FF14P2TTS.Infrastructure.Speechify;
 using FF14P2TTS.Windows;
 using System;
 using System.Collections.Generic;
@@ -19,29 +20,25 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IDalamudPluginInterface PluginInterface { get; private set; } = null!;
     [PluginService] internal static ICommandManager CommandManager { get; private set; } = null!;
     [PluginService] internal static IChatGui ChatGui { get; private set; } = null!;
-    [PluginService] internal static IClientState ClientState { get; private set; } = null!;
-    [PluginService] internal static IObjectTable ObjectTable { get; private set; } = null!;
     [PluginService] internal static IAddonLifecycle AddonLifecycle { get; private set; } = null!;
-    [PluginService] internal static IGameGui GameGui { get; private set; } = null!;
     [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
+    [PluginService] internal static IClientState ClientState { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
-    [PluginService] internal static INotificationManager NotificationManager { get; private set; } = null!;
-    [PluginService] internal static ICondition Condition { get; private set; } = null!;
-    [PluginService] internal static IFramework Framework { get; private set; } = null!;
 
-    private const string CommandName = "/p2tts";
+    private const string CommandName = "/ff14tts";
 
     public Configuration Configuration { get; init; }
     public readonly WindowSystem WindowSystem = new("FF14P2TTS");
-    internal readonly Player2TtsService Player2Service;
-    internal readonly AzureTtsService AzureService;
+    private readonly IReadOnlyDictionary<TtsEngine, ITtsService> _ttsServicesByEngine;
     private readonly ITtsServiceProvider _ttsServices;
     internal ITtsService ActiveTtsService => _ttsServices.Active;
     private readonly NpcTalkHandler _npcTalkHandler;
-    private readonly AutoAdvanceHandler _autoAdvanceHandler;
-    private readonly ChatSpeechCoordinator _chatSpeechCoordinator;
     private readonly NpcDialogueCoordinator _npcDialogueCoordinator;
+    private readonly NpcVoiceMapper _npcVoiceMapper;
     private readonly INpcGenderResolver _npcGenderResolver;
+    private readonly ActiveQuestReader _activeQuestReader;
+    private readonly GroqEmotionTagger _groqTagger;
+    private readonly SpeechifyDialoguePreloader _speechifyPreloader;
     private ConfigWindow ConfigWindow { get; init; }
     private MainWindow MainWindow { get; init; }
     private readonly DialogueTester _dialogueTester;
@@ -87,29 +84,82 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.Version = 5;
             Configuration.Save();
         }
+        if (Configuration.Version < 7)
+        {
+            Configuration.Version = 7;
+            Configuration.Save();
+        }
+        if (Configuration.Version < 8)
+        {
+            Configuration.Version = 8;
+            Configuration.Save();
+        }
+        if (Configuration.Version < 9)
+        {
+            if (Configuration.GroqModel == "llama-3.3-70b-versatile")
+                Configuration.GroqModel = "openai/gpt-oss-20b";
+            Configuration.Version = 9;
+            Configuration.Save();
+        }
+        if (Configuration.Version < 10)
+        {
+            if (Configuration.GroqModel == "openai/gpt-oss-20b")
+                Configuration.GroqModel = "openai/gpt-oss-120b";
+            Configuration.Version = 10;
+            Configuration.Save();
+        }
+        if (Configuration.Version < 11)
+        {
+            Configuration.Version = 11;
+            Configuration.Save();
+        }
+        if (Configuration.Version < 12)
+        {
+            Configuration.Version = 12;
+            Configuration.Save();
+        }
 
         // Initialize TTS services (both, so user can switch at runtime)
-        Player2Service = new Player2TtsService(Configuration, Log);
-        AzureService = new AzureTtsService(Configuration, Log);
-
-        _ttsServices = new TtsServiceProvider(Configuration, Player2Service, AzureService);
-        _chatSpeechCoordinator = new ChatSpeechCoordinator(Configuration, _ttsServices);
+        _ttsServicesByEngine = new TtsServiceFactory(Configuration, Log).Create();
+        _ttsServices = new TtsServiceProvider(Configuration, _ttsServicesByEngine);
 
         // Initialize NPC talk handler
         _npcTalkHandler = new NpcTalkHandler(AddonLifecycle, Log, Configuration);
         _npcTalkHandler.OnNpcTalk += OnNpcTalk;
 
-        // Initialize auto-advance handler
-        _autoAdvanceHandler = new AutoAdvanceHandler(Configuration, Log, GameGui);
-
         _npcGenderResolver = new DalamudNpcGenderResolver(DataManager, Log, Configuration);
+        _npcVoiceMapper = new NpcVoiceMapper(Configuration);
+        _activeQuestReader = new ActiveQuestReader(DataManager);
+        _groqTagger = new GroqEmotionTagger(Configuration, Log);
+        Func<IReadOnlyList<ActiveQuestInfo>> activeQuests = () => _activeQuestReader.ReadActiveQuests();
+        Func<IReadOnlyList<string>> activeQuestNames = () => activeQuests()
+            .Select(quest => quest.Name)
+            .ToList();
+        Func<bool> questReadAvailable = () => _activeQuestReader.QuestReadAvailable;
+        var voicedCutsceneDetector = new ConsoleGamesWikiVoicedCutsceneDetector(
+            Log,
+            activeQuestNames,
+            questReadAvailable);
         _npcDialogueCoordinator = new NpcDialogueCoordinator(
             Configuration,
             _ttsServices,
-            new NpcVoiceMapper(Configuration),
+            _npcVoiceMapper,
             _npcGenderResolver,
-            _autoAdvanceHandler,
+            voicedCutsceneDetector,
             Log);
+
+        // Preload Speechify audio for the active quests' wiki-scripted unvoiced
+        // dialogue so the next line plays without Speechify synthesis latency.
+        _speechifyPreloader = new SpeechifyDialoguePreloader(
+            Configuration,
+            Log,
+            (SpeechifyTtsService)_ttsServicesByEngine[TtsEngine.Speechify],
+            voicedCutsceneDetector,
+            activeQuests,
+            speaker => _npcDialogueCoordinator.ResolveVoiceFor(speaker));
+        _npcDialogueCoordinator.SetPreloader(_speechifyPreloader);
+        _speechifyPreloader.Start();
+        ClientState.TerritoryChanged += OnTerritoryChanged;
 
         // Create windows
         ConfigWindow = new ConfigWindow(this);
@@ -120,7 +170,8 @@ public sealed class Plugin : IDalamudPlugin
         // Register slash command
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "Open the Player2 TTS configuration. Subcommands: on, off, toggle, status, test [message], voice [name], engine [player2|azure]"
+            HelpMessage = "Open settings or show active quests. Subcommands: on, off, toggle, status, "
+                        + "quests, test [message], voice [name], engine [player2|azure|elevenlabs|speechify]"
         });
 
         // Register UI callbacks
@@ -129,19 +180,14 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
 
         // Subscribe to chat messages (read-only, after game processes them)
-        ChatGui.ChatMessageUnhandled += OnChatMessage;
-
-        var engineName = Configuration.ActiveEngine == TtsEngine.MicrosoftAzure ? "Azure" : "Player2";
-        Log.Information($"[FF14P2TTS] Plugin loaded. Engine: {engineName}");
-        _dialogueTester = new DialogueTester(AddonLifecycle, NotificationManager, Condition);
+        Log.Information($"[FF14P2TTS] Plugin loaded. Engine: {GetEngineDisplayName(Configuration.ActiveEngine)}");
+        _dialogueTester = new DialogueTester(AddonLifecycle);
     }
 
     public void Dispose()
     {
         _npcTalkHandler.OnNpcTalk -= OnNpcTalk;
         _npcTalkHandler.Dispose();
-        _autoAdvanceHandler.Dispose();
-        ChatGui.ChatMessageUnhandled -= OnChatMessage;
         PluginInterface.UiBuilder.Draw -= WindowSystem.Draw;
         PluginInterface.UiBuilder.OpenConfigUi -= ToggleConfigUi;
         PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUi;
@@ -150,10 +196,11 @@ public sealed class Plugin : IDalamudPlugin
         ConfigWindow.Dispose();
         _dialogueTester.Dispose();
         MainWindow.Dispose();
-        Player2Service.Dispose();
-        AzureService.Dispose();
+        ClientState.TerritoryChanged -= OnTerritoryChanged;
+        _speechifyPreloader.Dispose();
+        foreach (var service in _ttsServicesByEngine.Values)
+            service.Dispose();
         CommandManager.RemoveHandler(CommandName);
-        ChatGui.ChatMessageUnhandled -= OnChatMessage;
     }
 
     private void OnCommand(string command, string args)
@@ -192,6 +239,10 @@ public sealed class Plugin : IDalamudPlugin
                 _ = ShowStatusAsync();
                 break;
 
+            case "quests":
+                ShowActiveQuests();
+                break;
+
             default:
                 if (trimmedArgs.StartsWith("test "))
                 {
@@ -212,6 +263,27 @@ public sealed class Plugin : IDalamudPlugin
                         PrintChat($"Default voice set to: {voice}");
                     }
                 }
+                else if (trimmedArgs.StartsWith("tag "))
+                {
+                    var tagText = args.Substring(4).Trim();
+                    if (!string.IsNullOrWhiteSpace(tagText))
+                        _ = ShowTagAsync(tagText);
+                }
+                else if (trimmedArgs.StartsWith("emotion "))
+                {
+                    var rest = args.Substring(8).Trim();
+                    var spaceIndex = rest.IndexOf(' ');
+                    if (spaceIndex < 0)
+                    {
+                        PrintChat("Usage: /ff14tts emotion <emotion> <text>");
+                    }
+                    else
+                    {
+                        var emotion = rest[..spaceIndex].Trim().ToLowerInvariant();
+                        var text = rest[(spaceIndex + 1)..].Trim();
+                        _ = SpeakWithEmotionAsync(emotion, text);
+                    }
+                }
                 else if (trimmedArgs.StartsWith("engine "))
                 {
                     var engineName = args.Substring(7).Trim().ToLowerInvariant();
@@ -227,9 +299,21 @@ public sealed class Plugin : IDalamudPlugin
                         Configuration.Save();
                         PrintChat("Switched to Microsoft Azure TTS engine.");
                     }
+                    else if (engineName == "elevenlabs" || engineName == "eleven")
+                    {
+                        Configuration.ActiveEngine = TtsEngine.ElevenLabs;
+                        Configuration.Save();
+                        PrintChat("Switched to ElevenLabs TTS engine. API integration is not enabled yet.");
+                    }
+                    else if (engineName == "speechify")
+                    {
+                        Configuration.ActiveEngine = TtsEngine.Speechify;
+                        Configuration.Save();
+                        PrintChat("Switched to Speechify TTS engine.");
+                    }
                     else
                     {
-                        PrintChat("Usage: /p2tts engine [player2|azure]");
+                        PrintChat("Usage: /ff14tts engine [player2|azure|elevenlabs|speechify]");
                     }
                 }
                 else
@@ -240,9 +324,64 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 
+    private unsafe void ShowActiveQuests()
+    {
+        PrintChat("Reading active quests from the game...");
+        var quests = _activeQuestReader.ReadActiveQuests(out var diagnostic);
+        Log.Information($"[FF14P2TTS] {diagnostic}");
+        if (quests.Count == 0)
+        {
+            PrintChat($"No active normal quests found. {diagnostic}");
+            return;
+        }
+
+        PrintChat($"Active quests: {quests.Count}");
+        foreach (var quest in quests)
+            PrintChat($"{quest.Name} (ID {quest.Id}, step {quest.Sequence})");
+    }
+
+    private static readonly string[] ValidEmotions =
+    {
+        "angry", "cheerful", "sad", "terrified", "relaxed", "fearful", "surprised",
+        "calm", "assertive", "energetic", "warm", "direct", "bright",
+    };
+
+    private async Task SpeakWithEmotionAsync(string emotion, string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return;
+
+        if (!ValidEmotions.Contains(emotion))
+        {
+            PrintChat($"Unknown emotion '{emotion}'. Valid: {string.Join(", ", ValidEmotions)}");
+            return;
+        }
+
+        if (_ttsServices.Active is not ISsmlSpeechProvider ssmlProvider)
+        {
+            PrintChat("The active TTS engine does not support direct emotion SSML. Switch to Speechify.");
+            return;
+        }
+
+        var escaped = System.Security.SecurityElement.Escape(text);
+        var ssml = $"<speak><speechify:style emotion=\"{emotion}\">{escaped}</speechify:style></speak>";
+        PrintChat($"Speaking with emotion '{emotion}': {text}");
+        await ssmlProvider.SpeakSsmlAsync(ssml);
+    }
+
+    private async Task ShowTagAsync(string text)
+    {
+        PrintChat("Tagging with Groq...");
+        var (tagged, error) = await _groqTagger.TagWithErrorAsync(text, System.Threading.CancellationToken.None);
+        if (tagged is null)
+            PrintChat($"Groq tagging failed: {error}");
+        else
+            PrintChat($"Tagged: {tagged}");
+    }
+
     private async Task ShowStatusAsync()
     {
-        var engineName = Configuration.ActiveEngine == TtsEngine.MicrosoftAzure ? "Azure" : "Player2";
+        var engineName = GetEngineDisplayName(Configuration.ActiveEngine);
         PrintChat($"Checking {engineName} TTS server status...");
         var available = await ActiveTtsService.IsServerAvailableAsync();
         if (available)
@@ -250,7 +389,11 @@ public sealed class Plugin : IDalamudPlugin
             PrintChat($"[FF14P2TTS] {engineName} TTS engine is ONLINE.");
             var voices = await ActiveTtsService.GetAvailableVoicesAsync();
             if (voices.Length > 0)
-                PrintChat($"[FF14P2TTS] Available voices: {string.Join(", ", voices.Take(15))}{(voices.Length > 15 ? "..." : "")}");
+            {
+                var preview = string.Join(", ", voices.Take(15));
+                var suffix = voices.Length > 15 ? "..." : "";
+                PrintChat($"[FF14P2TTS] Available voices: {preview}{suffix}");
+            }
         }
         else
         {
@@ -258,214 +401,31 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 
-    private void OnChatMessage(IChatMessage msg)
-    {
-        var chatType = (int)msg.LogKind;
-        var senderName = msg.Sender.TextValue;
-        var messageText = msg.Message.TextValue;
-
-        var localPlayer = ObjectTable.LocalPlayer;
-        var isOwnMessage = !Configuration.ReadOwnMessages
-            && localPlayer is not null
-            && senderName == localPlayer.Name.TextValue;
-
-        if (_chatSpeechCoordinator.TrySpeak(chatType, senderName, messageText, ClientState.IsPvPExcludingDen, isOwnMessage))
-            Log.Debug($"[FF14P2TTS] Queued TTS: {messageText}");
-    }
-
     private void OnNpcTalk(string speaker, string text)
     {
-        _npcDialogueCoordinator.Handle(speaker, text, _dialogueTester.IsNativeVoiceSubtitleVisible);
+        _ = _npcDialogueCoordinator.HandleAsync(speaker, text, _dialogueTester.IsNativeVoiceSubtitleActive());
+    }
+
+    private void OnTerritoryChanged(uint territoryType)
+    {
+        _speechifyPreloader.SweepForFinishedQuests();
     }
 
     internal NpcGender GetNpcGender(string speakerName) => _npcGenderResolver.GetGender(speakerName);
 
-#if false // Superseded by Application/NpcDialogueCoordinator.
-    private string _lastNpcSpeaker = string.Empty;
-
-    private void OnNpcTalk(string speaker, string text)
+    internal void ForgetNpc(string speakerName)
     {
-        if (!Configuration.TtsEnabled) return;
-
-        // TalkSubtitle is visible only while the game presents native spoken subtitles.
-        // It is line-level state, so unvoiced cutscene dialogue remains eligible for TTS.
-        if (Configuration.SkipTtsDuringCutscenes && _dialogueTester.IsNativeVoiceSubtitleVisible)
-        {
-            Log.Debug("[FF14P2TTS] Native voice subtitle visible — skipping NPC TTS");
-            return;
-        }
-
-        // Prepend speaker name if enabled and different from last speaker
-        var textToSpeak = text;
-        if (Configuration.IncludeNpcSpeakerName && !string.IsNullOrWhiteSpace(speaker))
-        {
-            if (!string.Equals(speaker, _lastNpcSpeaker, StringComparison.OrdinalIgnoreCase))
-            {
-                textToSpeak = $"{speaker} says: {text}";
-                _lastNpcSpeaker = speaker;
-            }
-        }
-
-        var isAzure = Configuration.ActiveEngine == TtsEngine.MicrosoftAzure;
-        var useGendered = isAzure ? Configuration.AzureUseGenderedVoices : Configuration.UseGenderedVoices;
-
-        if (useGendered)
-        {
-            var gender = GetNpcGender(speaker);
-            string voiceId;
-
-            if (isAzure ? Configuration.AzureUsePerNpcVoices : Configuration.UsePerNpcVoices)
-            {
-                // Fetch fresh voice list (cached briefly)
-                var voices = _cachedVoiceList;
-                if (voices is null)
-                {
-                    _ = RefreshVoiceCacheAsync();
-                    voiceId = isAzure
-                        ? gender switch { NpcGender.Male => Configuration.AzureMaleVoice, NpcGender.Female => Configuration.AzureFemaleVoice, _ => Configuration.AzureUnisexVoice }
-                        : gender switch { NpcGender.Male => Configuration.MaleVoiceId, NpcGender.Female => Configuration.FemaleVoiceId, _ => Configuration.UnisexVoiceId };
-                }
-                else
-                {
-                    voiceId = _npcVoiceMapper.GetVoiceForNpc(speaker, gender, voices);
-                }
-            }
-            else
-            {
-                voiceId = isAzure
-                    ? gender switch { NpcGender.Male => Configuration.AzureMaleVoice, NpcGender.Female => Configuration.AzureFemaleVoice, _ => Configuration.AzureUnisexVoice }
-                    : gender switch { NpcGender.Male => Configuration.MaleVoiceId, NpcGender.Female => Configuration.FemaleVoiceId, _ => Configuration.UnisexVoiceId };
-            }
-
-            Log.Debug($"[FF14P2TTS] NPC: {speaker} -> {gender}, voice={voiceId}, engine={Configuration.ActiveEngine}");
-            _ = ActiveTtsService.SpeakAsync(textToSpeak, voice: voiceId);
-            _autoAdvanceHandler.OnDialogSpoken(textToSpeak);
-        }
-        else
-        {
-            var defaultVoice = isAzure ? Configuration.AzureUnisexVoice : Configuration.UnisexVoiceId;
-            _ = ActiveTtsService.SpeakAsync(textToSpeak, voice: defaultVoice);
-            _autoAdvanceHandler.OnDialogSpoken(textToSpeak);
-        }
+        _npcGenderResolver.Forget(speakerName);
+        _npcVoiceMapper.ForgetNpc(speakerName);
     }
 
-    private List<VoiceInfo>? _cachedVoiceList;
-
-    private async System.Threading.Tasks.Task RefreshVoiceCacheAsync()
+    private static string GetEngineDisplayName(TtsEngine engine) => engine switch
     {
-        try
-        {
-            var all = await ActiveTtsService.GetAvailableVoicesRawAsync();
-            // Only use English voices for NPC assignments
-            _cachedVoiceList = all
-                .Where(v => v.RawLanguage == "american_english" || v.RawLanguage == "british_english")
-                .ToList();
-            if (_cachedVoiceList.Count == 0)
-                _cachedVoiceList = all; // fallback if no English filter matches
-        }
-        catch
-        {
-            _cachedVoiceList = null;
-        }
-    }
-
-    private readonly ConcurrentDictionary<string, NpcGender> _genderCache = new();
-
-    internal NpcGender GetNpcGender(string speakerName)
-    {
-        if (string.IsNullOrWhiteSpace(speakerName)) return NpcGender.Unknown;
-
-        if (_genderCache.TryGetValue(speakerName, out var cached))
-            return cached;
-
-        var residents = DataManager.GetExcelSheet<ENpcResident>();
-        var bases = DataManager.GetExcelSheet<ENpcBase>();
-
-        if (residents != null && bases != null)
-        {
-            foreach (var row in residents)
-            {
-                if (string.Equals(row.Singular.ExtractText(), speakerName, StringComparison.OrdinalIgnoreCase))
-                {
-                    var baseRow = bases.GetRow(row.RowId);
-                    // ENpcBase.Gender uses 1 = male and 2 = female. Zero and
-                    // other values are non-gendered/unknown NPC representations.
-                    var gender = baseRow.Gender == 1 ? NpcGender.Male :
-                                 baseRow.Gender == 2 ? NpcGender.Female : NpcGender.Unknown;
-
-                    _genderCache[speakerName] = gender;
-                    Log.Debug($"[FF14P2TTS] Sheet: '{speakerName}' → {gender}");
-                    return gender;
-                }
-            }
-        }
-
-        _genderCache[speakerName] = NpcGender.Unknown;
-        Log.Debug($"[FF14P2TTS] '{speakerName}' not found in ENpcResident");
-        return NpcGender.Unknown;
-    }
-
-    private bool ShouldReadChatType(int chatType)
-    {
-        // FFXIV chat type codes
-        return chatType switch
-        {
-            10  => Configuration.ReadSay,            // Say
-            11  => Configuration.ReadSay,            // Say (alternate)
-            14  => Configuration.ReadParty,          // Party
-            15  => Configuration.ReadParty,          // Party (alternate)
-            16  => Configuration.ReadAlliance,       // Alliance
-            17  => Configuration.ReadAlliance,       // Alliance (alternate)
-            18  => Configuration.ReadYell,           // Yell
-            19  => Configuration.ReadShout,          // Shout
-            20  => Configuration.ReadFreeCompany,    // Free Company
-            22  => Configuration.ReadTell,           // Tell (incoming)
-            23  => Configuration.ReadTell,           // Tell (outgoing) - you'd hear your own tells being sent
-            26  => Configuration.ReadSay,            // NPC Say
-            30  => Configuration.ReadLinkshell1,     // Linkshell 1
-            31  => Configuration.ReadLinkshell2,     // Linkshell 2
-            32  => Configuration.ReadLinkshell3,     // Linkshell 3
-            33  => Configuration.ReadLinkshell4,     // Linkshell 4
-            34  => Configuration.ReadLinkshell5,     // Linkshell 5
-            35  => Configuration.ReadLinkshell6,     // Linkshell 6
-            36  => Configuration.ReadLinkshell7,     // Linkshell 7
-            37  => Configuration.ReadLinkshell8,     // Linkshell 8
-            61  => Configuration.ReadNoviceNetwork,  // Novice Network
-            56  => Configuration.ReadEmote,          // Custom Emotes
-            57  => Configuration.ReadSystemMessage,  // System Messages
-            68  => Configuration.ReadEmote,          // Standard Emotes
-            105 => Configuration.ReadEmote,          // Battle Emotes
-            _   => false
-        };
-    }
-
-    private static string? GetChannelKey(int chatType)
-    {
-        return chatType switch
-        {
-            10 or 11 => "say",
-            14 or 15 => "party",
-            16 or 17 => "alliance",
-            18 => "yell",
-            19 => "shout",
-            20 => "freecompany",
-            22 or 23 => "tell",
-            30 => "linkshell1",
-            31 => "linkshell2",
-            32 => "linkshell3",
-            33 => "linkshell4",
-            34 => "linkshell5",
-            35 => "linkshell6",
-            36 => "linkshell7",
-            37 => "linkshell8",
-            61 => "novicenetwork",
-            56 or 68 or 105 => "emote",
-            57 => "system",
-            _ => null
-        };
-    }
-
- #endif
+        TtsEngine.MicrosoftAzure => "Azure",
+        TtsEngine.ElevenLabs => "ElevenLabs",
+        TtsEngine.Speechify => "Speechify",
+        _ => "Player2",
+    };
 
     private void PrintChat(string message)
     {

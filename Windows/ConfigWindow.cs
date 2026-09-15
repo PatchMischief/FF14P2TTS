@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Reflection;
 using Dalamud.Interface.Windowing;
 using Dalamud.Interface.Utility;
 using Dalamud.Bindings.ImGui;
@@ -19,12 +20,13 @@ public class ConfigWindow : Window, IDisposable
     // Cached voice lists
     private List<VoiceInfo>? _cachedPlayer2Voices;
     private List<VoiceInfo>? _cachedAzureVoices;
+    private List<VoiceInfo>? _cachedSpeechifyVoices;
     private bool _voicesFetched;
     private string _npcGenderOverrideName = string.Empty;
     private int _npcGenderOverrideIndex;
 
     public ConfigWindow(Plugin plugin) : base(
-        "Player2 TTS Configuration###FF14P2TTSConfig",
+        "FF14 TTS Configuration###FF14TTSConfig",
         ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse)
     {
         Size = new Vector2(550, 600);
@@ -58,18 +60,6 @@ public class ConfigWindow : Window, IDisposable
                 ImGui.EndTabItem();
             }
 
-            if (ImGui.BeginTabItem("Chat Channels"))
-            {
-                DrawChannelsTab();
-                ImGui.EndTabItem();
-            }
-
-            if (ImGui.BeginTabItem("Voice Overrides"))
-            {
-                DrawVoiceOverridesTab();
-                ImGui.EndTabItem();
-            }
-
             if (ImGui.BeginTabItem("Advanced"))
             {
                 DrawAdvancedTab();
@@ -85,18 +75,25 @@ public class ConfigWindow : Window, IDisposable
         ImGui.Separator(); ImGui.Text("TTS Engine Selection");
 
         // Engine dropdown
-        var engineNames = new[] { "Player2 (Local)", "Microsoft Azure (Cloud)" };
-        var currentEngineIndex = _configuration.ActiveEngine == TtsEngine.MicrosoftAzure ? 1 : 0;
+        var engineNames = new[]
+        {
+            "Player2 (Local)",
+            "Microsoft Azure (Cloud)",
+            "ElevenLabs (Cloud)",
+            "Speechify (Cloud)",
+        };
+        var currentEngineIndex = (int)_configuration.ActiveEngine;
         ImGui.Text("TTS Engine:");
         ImGui.SameLine();
         ImGui.SetNextItemWidth(250);
         if (ImGui.Combo("##engine", ref currentEngineIndex, engineNames, engineNames.Length))
         {
-            _configuration.ActiveEngine = currentEngineIndex == 1 ? TtsEngine.MicrosoftAzure : TtsEngine.Player2;
+            _configuration.ActiveEngine = (TtsEngine)Math.Clamp(currentEngineIndex, 0, engineNames.Length - 1);
             _configuration.Save();
             // Clear cached voices when switching engine
             _cachedPlayer2Voices = null;
             _cachedAzureVoices = null;
+            _cachedSpeechifyVoices = null;
             _voicesFetched = false;
         }
 
@@ -132,7 +129,7 @@ public class ConfigWindow : Window, IDisposable
                 _ = TestConnectionAsync();
             }
         }
-        else
+        else if (_configuration.ActiveEngine == TtsEngine.MicrosoftAzure)
         {
             // --- Azure-specific settings ---
             ImGui.Separator(); ImGui.Text("Azure Connection");
@@ -197,10 +194,107 @@ public class ConfigWindow : Window, IDisposable
             }
             ImGuiExt.HelpMarker("Custom Speech service endpoint. Leave blank unless you use a private endpoint or sovereign cloud.\nThe correct format is: https://{region}.tts.speech.microsoft.com/\nIf you set a Region above, this field is ignored — the SDK constructs the correct endpoint automatically.");
 
+            ImGui.Spacing();
+            var azUseEmotion = _configuration.AzureUseEmotionTagging;
+            if (ImGui.Checkbox("Use Groq emotion tagging (Azure styles)", ref azUseEmotion))
+            {
+                _configuration.AzureUseEmotionTagging = azUseEmotion;
+                _configuration.Save();
+            }
+            ImGuiExt.HelpMarker("Classifies each line with an Azure mstts:express-as style using Groq before synthesis. Requires a Groq API key.");
+
+            var groqKey = _configuration.GroqApiKey;
+            ImGui.Text("Groq API Key:");
+            ImGui.SetNextItemWidth(350);
+            if (ImGui.InputText("##azgroqkey", ref groqKey, 256))
+            {
+                _configuration.GroqApiKey = groqKey;
+                _configuration.Save();
+            }
+
+            var groqModel = _configuration.GroqModel;
+            ImGui.Text("Groq Model:");
+            ImGui.SetNextItemWidth(350);
+            if (ImGui.InputText("##azgroqmodel", ref groqModel, 128))
+            {
+                _configuration.GroqModel = groqModel;
+                _configuration.Save();
+            }
+
             ImGui.SameLine();
             if (ImGui.Button("Test Connection"))
             {
                 _ = TestConnectionAsync();
+            }
+        }
+        else if (_configuration.ActiveEngine == TtsEngine.ElevenLabs)
+        {
+            ImGui.Separator(); ImGui.Text("ElevenLabs Connection");
+            var apiKey = _configuration.ElevenLabsApiKey;
+            ImGui.Text("API Key:");
+            ImGui.SetNextItemWidth(350);
+            if (ImGui.InputText("##elevenkey", ref apiKey, 256))
+            {
+                _configuration.ElevenLabsApiKey = apiKey;
+                _configuration.Save();
+            }
+
+            var baseUrl = _configuration.ElevenLabsBaseUrl;
+            ImGui.Text("API URL:");
+            ImGui.SetNextItemWidth(350);
+            if (ImGui.InputText("##elevenurl", ref baseUrl, 256))
+            {
+                _configuration.ElevenLabsBaseUrl = baseUrl;
+                _configuration.Save();
+            }
+
+            ImGui.TextWrapped("ElevenLabs provider wiring is ready; synthesis and voice loading will be added in a later integration.");
+        }
+        else
+        {
+            ImGui.Separator(); ImGui.Text("Speechify Connection");
+            var apiKey = _configuration.SpeechifyApiKey;
+            ImGui.Text("API Key:");
+            ImGui.SetNextItemWidth(350);
+            if (ImGui.InputText("##speechifykey", ref apiKey, 256))
+            {
+                _configuration.SpeechifyApiKey = apiKey;
+                _configuration.Save();
+            }
+            var baseUrl = _configuration.SpeechifyBaseUrl;
+            ImGui.Text("API URL:");
+            ImGui.SetNextItemWidth(350);
+            if (ImGui.InputText("##speechifyurl", ref baseUrl, 256))
+            {
+                _configuration.SpeechifyBaseUrl = baseUrl;
+                _configuration.Save();
+            }
+
+            ImGui.Spacing();
+            var useEmotion = _configuration.SpeechifyUseEmotionTagging;
+            if (ImGui.Checkbox("Use Groq emotion tagging", ref useEmotion))
+            {
+                _configuration.SpeechifyUseEmotionTagging = useEmotion;
+                _configuration.Save();
+            }
+            ImGuiExt.HelpMarker("Tags each line with a Speechify emotion using Groq before synthesis. Requires a Groq API key.");
+
+            var groqKey = _configuration.GroqApiKey;
+            ImGui.Text("Groq API Key:");
+            ImGui.SetNextItemWidth(350);
+            if (ImGui.InputText("##groqkey", ref groqKey, 256))
+            {
+                _configuration.GroqApiKey = groqKey;
+                _configuration.Save();
+            }
+
+            var groqModel = _configuration.GroqModel;
+            ImGui.Text("Groq Model:");
+            ImGui.SetNextItemWidth(350);
+            if (ImGui.InputText("##groqmodel", ref groqModel, 128))
+            {
+                _configuration.GroqModel = groqModel;
+                _configuration.Save();
             }
         }
 
@@ -226,9 +320,9 @@ public class ConfigWindow : Window, IDisposable
                 _configuration.DefaultVoice = voice;
                 _configuration.Save();
             }
-            ImGuiExt.HelpMarker("Player2 voice UUID. Leave blank to use preset-based voices.\nUse /p2tts status to see available voices.");
+            ImGuiExt.HelpMarker("Player2 voice UUID. Leave blank to use preset-based voices.\nUse /ff14tts status to see available voices.");
         }
-        else
+        else if (_configuration.ActiveEngine == TtsEngine.MicrosoftAzure)
         {
             var azVoice = _configuration.AzureDefaultVoice;
             ImGui.Text("Default Voice:");
@@ -240,6 +334,28 @@ public class ConfigWindow : Window, IDisposable
                 _configuration.Save();
             }
             ImGuiExt.HelpMarker("Azure neural voice name, e.g. en-US-AriaNeural.\nSee Voice Presets tab for a list.");
+        }
+        else if (_configuration.ActiveEngine == TtsEngine.ElevenLabs)
+        {
+            var voice = _configuration.ElevenLabsDefaultVoice;
+            ImGui.Text("ElevenLabs Voice ID:");
+            ImGui.SetNextItemWidth(300);
+            if (ImGui.InputText("##elevenvoice", ref voice, 128))
+            {
+                _configuration.ElevenLabsDefaultVoice = voice;
+                _configuration.Save();
+            }
+        }
+        else
+        {
+            var voice = _configuration.SpeechifyDefaultVoice;
+            ImGui.Text("Speechify Voice ID:");
+            ImGui.SetNextItemWidth(300);
+            if (ImGui.InputText("##speechifyvoice", ref voice, 128))
+            {
+                _configuration.SpeechifyDefaultVoice = voice;
+                _configuration.Save();
+            }
         }
 
         // Volume
@@ -263,40 +379,28 @@ public class ConfigWindow : Window, IDisposable
         }
 
         ImGui.Spacing();
-        ImGui.Separator(); ImGui.Text("Speaker Name");
+        ImGui.Separator(); ImGui.Text("NPC Dialog");
 
-        var includeSpeaker = _configuration.IncludeSpeakerName;
-        if (ImGui.Checkbox("Include speaker name in TTS", ref includeSpeaker))
-        {
-            _configuration.IncludeSpeakerName = includeSpeaker;
-            _configuration.Save();
-        }
-
-        var readOwn = _configuration.ReadOwnMessages;
-        if (ImGui.Checkbox("Also read my own messages", ref readOwn))
-        {
-            _configuration.ReadOwnMessages = readOwn;
-            _configuration.Save();
-        }
-
-        if (_configuration.IncludeSpeakerName)
-        {
-            var format = _configuration.SpeakerNameFormat;
-            ImGui.Text("Format:");
-            ImGui.SameLine();
-            if (ImGui.InputText("##fmt", ref format, 256))
-            {
-                _configuration.SpeakerNameFormat = format;
-                _configuration.Save();
-            }
-            ImGuiExt.HelpMarker("{0} = speaker name, {1} = message text\nDefault: \"{0} says: {1}\"");
-        }
+        CheckboxConfig("NPC Talk (dialog bubbles)", _configuration.ReadNpcTalk, v => _configuration.ReadNpcTalk = v);
+        CheckboxConfig("NPC Battle Talk", _configuration.ReadNpcBattleTalk, v => _configuration.ReadNpcBattleTalk = v);
+        CheckboxConfig(
+            "Skip TTS during cutscenes (voiced)",
+            _configuration.SkipTtsDuringCutscenes,
+            v => _configuration.SkipTtsDuringCutscenes = v);
+        ImGuiExt.HelpMarker("When enabled, TTS will NOT read dialogue during voiced cutscenes.\nFFXIV cutscenes already have voice acting, so TTS would be redundant.\nRegular NPC dialogue outside of cutscenes is still read normally.");
+        ImGui.Spacing();
+        CheckboxConfig(
+            "Say speaker name before dialogue",
+            _configuration.IncludeNpcSpeakerName,
+            v => _configuration.IncludeNpcSpeakerName = v);
+        ImGuiExt.HelpMarker("When enabled, the NPC's name is spoken before their dialogue.\nThe name is only said when the speaker changes (not repeated for consecutive lines).");
 
         ImGui.Spacing();
         if (ImGui.Button("Test TTS", new Vector2(120, 30)))
         {
             var engineLabel = _configuration.ActiveEngine == TtsEngine.MicrosoftAzure ? "Azure" : "Player2";
-            _ = _plugin.ActiveTtsService.SpeakAsync($"Hello, this is a test message from the {engineLabel} TTS engine.");
+            _ = _plugin.ActiveTtsService.SpeakAsync(
+                $"Hello, this is a test message from the {engineLabel} TTS engine.");
             PrintChat($"Test message sent to {engineLabel} TTS.");
         }
     }
@@ -304,7 +408,13 @@ public class ConfigWindow : Window, IDisposable
     private void DrawNpcVoicesTab()
     {
         var isAzure = _configuration.ActiveEngine == TtsEngine.MicrosoftAzure;
-        var assignments = isAzure ? _configuration.AzureNpcVoiceAssignments : _configuration.NpcVoiceAssignments;
+        var assignments = isAzure
+            ? _configuration.AzureNpcVoiceAssignments
+            : _configuration.ActiveEngine == TtsEngine.ElevenLabs
+                ? _configuration.ElevenLabsNpcVoiceAssignments
+                : _configuration.ActiveEngine == TtsEngine.Speechify
+                    ? _configuration.SpeechifyNpcVoiceAssignments
+                : _configuration.NpcVoiceAssignments;
 
         ImGui.Separator(); ImGui.Text("Assigned NPC Voices");
         ImGui.TextWrapped("View and change voices assigned to NPCs you've encountered. Voices are auto-assigned the first time an NPC speaks.");
@@ -347,7 +457,11 @@ public class ConfigWindow : Window, IDisposable
         var filterGender = genderValues[_npcVoiceFilterIndex];
 
         // Get cached voice list
-        var cachedVoices = isAzure ? _cachedAzureVoices : _cachedPlayer2Voices;
+        var cachedVoices = isAzure
+            ? _cachedAzureVoices
+            : _configuration.ActiveEngine == TtsEngine.Speechify
+                ? _cachedSpeechifyVoices
+                : _cachedPlayer2Voices;
         if (cachedVoices is null or { Count: 0 })
         {
             if (ImGui.Button("Load Voice List")) _ = FetchVoicesAsync();
@@ -403,9 +517,13 @@ public class ConfigWindow : Window, IDisposable
             // Voice dropdown filtered by NPC gender
             var voicesForNpc = gender switch
             {
-                NpcGender.Male => enVoices.Where(v => string.Equals(v.Gender, "male", StringComparison.OrdinalIgnoreCase)).ToList(),
-                NpcGender.Female => enVoices.Where(v => string.Equals(v.Gender, "female", StringComparison.OrdinalIgnoreCase)
-                                                        && (!isAzure || !string.Equals(v.Id, "en-US-AnaNeural", StringComparison.OrdinalIgnoreCase))).ToList(),
+                NpcGender.Male => enVoices
+                    .Where(v => string.Equals(v.Gender, "male", StringComparison.OrdinalIgnoreCase))
+                    .ToList(),
+                NpcGender.Female => enVoices
+                    .Where(v => string.Equals(v.Gender, "female", StringComparison.OrdinalIgnoreCase)
+                        && (!isAzure || !string.Equals(v.Id, "en-US-AnaNeural", StringComparison.OrdinalIgnoreCase)))
+                    .ToList(),
                 _ => enVoices
             };
             if (voicesForNpc.Count == 0) voicesForNpc = enVoices;
@@ -440,8 +558,7 @@ public class ConfigWindow : Window, IDisposable
             ImGui.SameLine();
             if (ImGui.SmallButton($"X##npcremove_{npcName}"))
             {
-                assignments.Remove(npcName);
-                _configuration.Save();
+                _plugin.ForgetNpc(npcName);
             }
         }
 
@@ -460,72 +577,15 @@ public class ConfigWindow : Window, IDisposable
         ImGui.SameLine();
         if (ImGui.SmallButton("Reset All Assignments"))
         {
+            var npcNames = assignments.Keys.ToList();
             assignments.Clear();
+            foreach (var npcName in npcNames)
+                _plugin.ForgetNpc(npcName);
             _configuration.Save();
         }
     }
 
     private int _npcVoiceFilterIndex;
-
-    private void DrawChannelsTab()
-    {
-        ImGui.Separator(); ImGui.Text("Chat Channels to Read Aloud");
-        ImGui.TextWrapped("Select which chat channels should be read via TTS.");
-
-        ImGui.Spacing();
-
-        CheckboxConfig("Say", _configuration.ReadSay, v => _configuration.ReadSay = v);
-        CheckboxConfig("Party", _configuration.ReadParty, v => _configuration.ReadParty = v);
-        CheckboxConfig("Alliance", _configuration.ReadAlliance, v => _configuration.ReadAlliance = v);
-        CheckboxConfig("Free Company", _configuration.ReadFreeCompany, v => _configuration.ReadFreeCompany = v);
-        CheckboxConfig("Tell / Whisper", _configuration.ReadTell, v => _configuration.ReadTell = v);
-        CheckboxConfig("Yell", _configuration.ReadYell, v => _configuration.ReadYell = v);
-        CheckboxConfig("Shout", _configuration.ReadShout, v => _configuration.ReadShout = v);
-
-        ImGui.Spacing();
-        ImGui.Separator(); ImGui.Text("Linkshells");
-        CheckboxConfig("Linkshell 1", _configuration.ReadLinkshell1, v => _configuration.ReadLinkshell1 = v);
-        CheckboxConfig("Linkshell 2", _configuration.ReadLinkshell2, v => _configuration.ReadLinkshell2 = v);
-        CheckboxConfig("Linkshell 3", _configuration.ReadLinkshell3, v => _configuration.ReadLinkshell3 = v);
-        CheckboxConfig("Linkshell 4", _configuration.ReadLinkshell4, v => _configuration.ReadLinkshell4 = v);
-        CheckboxConfig("Linkshell 5", _configuration.ReadLinkshell5, v => _configuration.ReadLinkshell5 = v);
-        CheckboxConfig("Linkshell 6", _configuration.ReadLinkshell6, v => _configuration.ReadLinkshell6 = v);
-        CheckboxConfig("Linkshell 7", _configuration.ReadLinkshell7, v => _configuration.ReadLinkshell7 = v);
-        CheckboxConfig("Linkshell 8", _configuration.ReadLinkshell8, v => _configuration.ReadLinkshell8 = v);
-
-        ImGui.Spacing();
-        ImGui.Separator(); ImGui.Text("Other");
-        CheckboxConfig("Novice Network", _configuration.ReadNoviceNetwork, v => _configuration.ReadNoviceNetwork = v);
-        CheckboxConfig("Emotes", _configuration.ReadEmote, v => _configuration.ReadEmote = v);
-        CheckboxConfig("System Messages", _configuration.ReadSystemMessage, v => _configuration.ReadSystemMessage = v);
-
-        ImGui.Spacing();
-        ImGui.Separator(); ImGui.Text("NPC Dialog");
-        ImGui.TextWrapped("Read NPC dialogue bubbles aloud.");
-        CheckboxConfig("NPC Talk (dialog bubbles)", _configuration.ReadNpcTalk, v => _configuration.ReadNpcTalk = v);
-        CheckboxConfig("NPC Battle Talk", _configuration.ReadNpcBattleTalk, v => _configuration.ReadNpcBattleTalk = v);
-        ImGui.Spacing();
-        CheckboxConfig("Skip TTS during cutscenes (voiced)", _configuration.SkipTtsDuringCutscenes, v => _configuration.SkipTtsDuringCutscenes = v);
-        ImGuiExt.HelpMarker("When enabled, TTS will NOT read dialogue during voiced cutscenes.\nFFXIV cutscenes already have voice acting, so TTS would be redundant.\nRegular NPC dialogue outside of cutscenes is still read normally.");
-        ImGui.Spacing();
-        CheckboxConfig("Say speaker name before dialogue", _configuration.IncludeNpcSpeakerName, v => _configuration.IncludeNpcSpeakerName = v);
-        ImGuiExt.HelpMarker("When enabled, the NPC's name is spoken before their dialogue.\nThe name is only said when the speaker changes (not repeated for consecutive lines).\nExample: \"Alphinaud says: We must hurry!\"");
-        ImGui.Spacing();
-        CheckboxConfig("Auto-advance NPC dialog", _configuration.AutoAdvanceNpcDialog, v => _configuration.AutoAdvanceNpcDialog = v);
-        ImGuiExt.HelpMarker("Automatically presses Confirm after TTS finishes speaking each line.\nTiming is based on word count and WPM.");
-        if (_configuration.AutoAdvanceNpcDialog)
-        {
-            var wpm = _configuration.AutoAdvanceWpm;
-            ImGui.Text("Speech rate (WPM):");
-            ImGui.SameLine();
-            if (ImGui.SliderInt("##wpm", ref wpm, 80, 300))
-            {
-                _configuration.AutoAdvanceWpm = wpm;
-                _configuration.Save();
-            }
-            ImGuiExt.HelpMarker("Words per minute. Default 160.\nLower = longer wait before advancing.\nMatch this to how fast your TTS engine speaks.");
-        }
-    }
 
     private void CheckboxConfig(string label, bool current, Action<bool> setter)
     {
@@ -537,78 +597,75 @@ public class ConfigWindow : Window, IDisposable
         }
     }
 
-    private void DrawVoiceOverridesTab()
+    private bool GetUsePerNpcVoices(bool isSpeechify, bool isAzure)
     {
-        ImGui.Separator(); ImGui.Text("Per-Channel Voice Overrides");
-        ImGui.TextWrapped("Set different voices for different chat channels. Leave blank to use the default voice.");
+        if (isSpeechify) return _configuration.SpeechifyUsePerNpcVoices;
+        if (isAzure) return _configuration.AzureUsePerNpcVoices;
+        return _configuration.UsePerNpcVoices;
+    }
 
-        ImGui.Spacing();
+    private string GetUnisexVoiceId(bool isSpeechify, bool isAzure)
+    {
+        if (isSpeechify) return _configuration.SpeechifyDefaultVoice;
+        if (isAzure) return _configuration.AzureUnisexVoice;
+        return _configuration.UnisexVoiceId;
+    }
 
-        var channels = new Dictionary<string, string>
-        {
-            { "say", "Say" },
-            { "party", "Party" },
-            { "alliance", "Alliance" },
-            { "yell", "Yell" },
-            { "shout", "Shout" },
-            { "freecompany", "Free Company" },
-            { "tell", "Tell / Whisper" },
-            { "linkshell1", "Linkshell 1" },
-            { "linkshell2", "Linkshell 2" },
-            { "linkshell3", "Linkshell 3" },
-            { "linkshell4", "Linkshell 4" },
-            { "linkshell5", "Linkshell 5" },
-            { "linkshell6", "Linkshell 6" },
-            { "linkshell7", "Linkshell 7" },
-            { "linkshell8", "Linkshell 8" },
-            { "novicenetwork", "Novice Network" },
-            { "emote", "Emotes" },
-            { "system", "System Messages" }
-        };
+    private string GetMaleVoiceId(bool isSpeechify, bool isAzure)
+    {
+        if (isSpeechify) return _configuration.SpeechifyMaleVoice;
+        if (isAzure) return _configuration.AzureMaleVoice;
+        return _configuration.MaleVoiceId;
+    }
 
-        foreach (var (key, label) in channels)
-        {
-            var currentVoice = _configuration.ChannelVoiceOverrides.GetValueOrDefault(key, string.Empty);
-            ImGui.Text($"{label}:");
-            ImGui.SameLine(150);
-            if (ImGui.InputText($"##voice_{key}", ref currentVoice, 128))
-            {
-                if (string.IsNullOrWhiteSpace(currentVoice))
-                    _configuration.ChannelVoiceOverrides.Remove(key);
-                else
-                    _configuration.ChannelVoiceOverrides[key] = currentVoice;
-                _configuration.Save();
-            }
-        }
+    private string GetFemaleVoiceId(bool isSpeechify, bool isAzure)
+    {
+        if (isSpeechify) return _configuration.SpeechifyFemaleVoice;
+        if (isAzure) return _configuration.AzureFemaleVoice;
+        return _configuration.FemaleVoiceId;
     }
 
     private void DrawVoicePresetsTab()
     {
         var isAzure = _configuration.ActiveEngine == TtsEngine.MicrosoftAzure;
+        var isSpeechify = _configuration.ActiveEngine == TtsEngine.Speechify;
+        if (_configuration.ActiveEngine == TtsEngine.ElevenLabs)
+        {
+            ImGui.TextWrapped("ElevenLabs voice presets are reserved for the upcoming provider integration.");
+            return;
+        }
 
         ImGui.Separator(); ImGui.Text("Voice Presets");
         ImGui.TextWrapped(isAzure
             ? "Choose Azure neural voices for different speaker types."
-            : "Choose voices for different speaker types. Fetched from Player2.");
+            : isSpeechify
+                ? "Choose Speechify voices for different speaker types. Fetched from your Speechify workspace."
+                : "Choose voices for different speaker types. Fetched from Player2.");
 
-        var useGendered = isAzure ? _configuration.AzureUseGenderedVoices : _configuration.UseGenderedVoices;
-        if (ImGui.Checkbox("Use gendered voices for NPCs", ref useGendered))
+        if (!isSpeechify)
         {
-            if (isAzure) _configuration.AzureUseGenderedVoices = useGendered;
-            else _configuration.UseGenderedVoices = useGendered;
-            _configuration.Save();
+            var useGendered = isAzure ? _configuration.AzureUseGenderedVoices : _configuration.UseGenderedVoices;
+            if (ImGui.Checkbox("Use gendered voices for NPCs", ref useGendered))
+            {
+                if (isAzure) _configuration.AzureUseGenderedVoices = useGendered;
+                else _configuration.UseGenderedVoices = useGendered;
+                _configuration.Save();
+            }
         }
 
-        var usePerNpc = isAzure ? _configuration.AzureUsePerNpcVoices : _configuration.UsePerNpcVoices;
+        var usePerNpc = GetUsePerNpcVoices(isSpeechify, isAzure);
         if (ImGui.Checkbox("Assign unique voice to each NPC", ref usePerNpc))
         {
-            if (isAzure) _configuration.AzureUsePerNpcVoices = usePerNpc;
+            if (isSpeechify) _configuration.SpeechifyUsePerNpcVoices = usePerNpc;
+            else if (isAzure) _configuration.AzureUsePerNpcVoices = usePerNpc;
             else _configuration.UsePerNpcVoices = usePerNpc;
             _configuration.Save();
         }
         ImGuiExt.HelpMarker("Each NPC gets a random English voice from their gender pool.\nAssignments persist across sessions.");
 
-        var assignments = isAzure ? _configuration.AzureNpcVoiceAssignments : _configuration.NpcVoiceAssignments;
+        var assignments = isSpeechify
+            ? _configuration.SpeechifyNpcVoiceAssignments
+            : isAzure ? _configuration.AzureNpcVoiceAssignments : _configuration.NpcVoiceAssignments;
         if (assignments.Count > 0)
         {
             ImGui.SameLine();
@@ -620,14 +677,15 @@ public class ConfigWindow : Window, IDisposable
             ImGui.Text($"({assignments.Count} NPC voices assigned)");
         }
 
-        if (!_voicesFetched && (isAzure ? _cachedAzureVoices : _cachedPlayer2Voices) is null)
+        var cachedVoices = isSpeechify
+            ? _cachedSpeechifyVoices
+            : isAzure ? _cachedAzureVoices : _cachedPlayer2Voices;
+        if (!_voicesFetched && cachedVoices is null)
             _ = FetchVoicesAsync();
 
         if (ImGui.Button("Refresh Voice List")) _ = FetchVoicesAsync();
 
         ImGui.Spacing();
-
-        var cachedVoices = isAzure ? _cachedAzureVoices : _cachedPlayer2Voices;
 
         if (cachedVoices is { Count: > 0 })
         {
@@ -642,19 +700,22 @@ public class ConfigWindow : Window, IDisposable
                 .ToList();
             var femaleVoices = enVoices
                 .Where(v => string.Equals(v.Gender, "female", StringComparison.OrdinalIgnoreCase)
-                            && (!isAzure || !string.Equals(v.Id, "en-US-AnaNeural", StringComparison.OrdinalIgnoreCase)))
+                    && (!isAzure || !string.Equals(v.Id, "en-US-AnaNeural", StringComparison.OrdinalIgnoreCase)))
                 .ToList();
 
-            ImGui.Text($"Loaded {enVoices.Count} English voices ({maleVoices.Count} male, {femaleVoices.Count} female)");
+            ImGui.Text(isSpeechify
+                ? $"Loaded {enVoices.Count} Speechify voices ({maleVoices.Count} male, {femaleVoices.Count} female)"
+                : $"Loaded {enVoices.Count} English voices ({maleVoices.Count} male, {femaleVoices.Count} female)");
 
-            var unisexId = isAzure ? _configuration.AzureUnisexVoice : _configuration.UnisexVoiceId;
-            var maleId = isAzure ? _configuration.AzureMaleVoice : _configuration.MaleVoiceId;
-            var femaleId = isAzure ? _configuration.AzureFemaleVoice : _configuration.FemaleVoiceId;
+            var unisexId = GetUnisexVoiceId(isSpeechify, isAzure);
+            var maleId = GetMaleVoiceId(isSpeechify, isAzure);
+            var femaleId = GetFemaleVoiceId(isSpeechify, isAzure);
 
             DrawVoiceCombo("Default / Unisex", "##unisex", unisexId,
                 enVoices, id =>
                 {
-                    if (isAzure) { _configuration.AzureUnisexVoice = id; _configuration.AzureDefaultVoice = id; }
+                    if (isSpeechify) _configuration.SpeechifyDefaultVoice = id;
+                    else if (isAzure) { _configuration.AzureUnisexVoice = id; _configuration.AzureDefaultVoice = id; }
                     else _configuration.UnisexVoiceId = id;
                     _configuration.Save();
                 });
@@ -666,7 +727,8 @@ public class ConfigWindow : Window, IDisposable
                 maleVoices.Count > 0 ? maleVoices : enVoices,
                 id =>
                 {
-                    if (isAzure) _configuration.AzureMaleVoice = id;
+                    if (isSpeechify) _configuration.SpeechifyMaleVoice = id;
+                    else if (isAzure) _configuration.AzureMaleVoice = id;
                     else _configuration.MaleVoiceId = id;
                     _configuration.Save();
                 });
@@ -678,7 +740,8 @@ public class ConfigWindow : Window, IDisposable
                 femaleVoices.Count > 0 ? femaleVoices : enVoices,
                 id =>
                 {
-                    if (isAzure) _configuration.AzureFemaleVoice = id;
+                    if (isSpeechify) _configuration.SpeechifyFemaleVoice = id;
+                    else if (isAzure) _configuration.AzureFemaleVoice = id;
                     else _configuration.FemaleVoiceId = id;
                     _configuration.Save();
                 });
@@ -688,9 +751,11 @@ public class ConfigWindow : Window, IDisposable
         }
         else if (_voicesFetched)
         {
-            var msg = isAzure
-                ? "No voices found. Check your Azure credentials."
-                : "No voices found. Is Player2 running?";
+            var msg = isSpeechify
+                ? "No voices found. Check your Speechify API key."
+                : isAzure
+                    ? "No voices found. Check your Azure credentials."
+                    : "No voices found. Is Player2 running?";
             ImGui.TextColored(new Vector4(1, 0.5f, 0, 1), msg);
         }
         else
@@ -729,6 +794,8 @@ public class ConfigWindow : Window, IDisposable
             var raw = await _plugin.ActiveTtsService.GetAvailableVoicesRawAsync();
             if (_configuration.ActiveEngine == TtsEngine.MicrosoftAzure)
                 _cachedAzureVoices = raw;
+            else if (_configuration.ActiveEngine == TtsEngine.Speechify)
+                _cachedSpeechifyVoices = raw;
             else
                 _cachedPlayer2Voices = raw;
             _voicesFetched = true;
@@ -738,6 +805,8 @@ public class ConfigWindow : Window, IDisposable
             _voicesFetched = true;
             if (_configuration.ActiveEngine == TtsEngine.MicrosoftAzure)
                 _cachedAzureVoices = null;
+            else if (_configuration.ActiveEngine == TtsEngine.Speechify)
+                _cachedSpeechifyVoices = null;
             else
                 _cachedPlayer2Voices = null;
         }
@@ -774,8 +843,12 @@ public class ConfigWindow : Window, IDisposable
         ImGui.Spacing();
         ImGui.Separator(); ImGui.Text("About");
 
-        ImGui.TextWrapped("FF14 Player2 TTS v1.0.0");
-        ImGui.TextWrapped("Connects FFXIV chat to Player2 or Microsoft Azure TTS for text-to-speech.");
+        var informational = typeof(Plugin).Assembly
+            .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion;
+        var version = informational is null ? "?" : informational.Split('+')[0];
+        ImGui.TextWrapped($"FF14 TTS v{version}");
+        ImGui.TextWrapped("Reads FFXIV NPC dialogue aloud via Player2, Microsoft Azure, ElevenLabs, or Speechify.");
     }
 
     private async System.Threading.Tasks.Task TestConnectionAsync()

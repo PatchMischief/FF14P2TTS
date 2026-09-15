@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -16,9 +17,14 @@ public interface ITtsService : IDisposable
     Task<bool> IsServerAvailableAsync(CancellationToken ct = default);
 
     /// <summary>
-    /// Get list of available voices as display strings (e.g., "Aria (EN-US)").
+    /// Get list of available voices as display strings. Defaults to the
+    /// <see cref="VoiceInfo.DisplayName"/> of each raw voice entry.
     /// </summary>
-    Task<string[]> GetAvailableVoicesAsync(CancellationToken ct = default);
+    async Task<string[]> GetAvailableVoicesAsync(CancellationToken ct = default)
+    {
+        var voices = await GetAvailableVoicesRawAsync(ct).ConfigureAwait(false);
+        return voices.Select(voice => voice.DisplayName).ToArray();
+    }
 
     /// <summary>
     /// Get structured voice data from the TTS engine.
@@ -33,5 +39,11 @@ public interface ITtsService : IDisposable
     /// <summary>
     /// Speak a message through the TTS engine.
     /// </summary>
-    Task SpeakAsync(string text, string? voice = null, double? speed = null, int? pitch = null, int? volume = null, CancellationToken ct = default);
+    Task SpeakAsync(
+        string text,
+        string? voice = null,
+        double? speed = null,
+        int? pitch = null,
+        int? volume = null,
+        CancellationToken ct = default);
 }

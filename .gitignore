@@ -11,3 +11,6 @@ obj/
 # NuGet / build temp
 *.nupkg
 *.snupkg
+
+# Graphify output (generated knowledge-graph artifacts) — do not commit.
+graphify-out/

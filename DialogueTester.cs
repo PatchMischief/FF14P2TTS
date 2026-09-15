@@ -1,120 +1,73 @@
 using System;
+using System.Diagnostics;
+using System.Threading;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
-using Dalamud.Game.ClientState.Conditions;
-using Dalamud.Interface.ImGuiNotification;
 using Dalamud.Plugin.Services;
-using Dalamud.Utility;
-using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace FF14P2TTS;
 
 /// <summary>
-/// Reports dialogue when the game finishes setting up its Talk UI.
-/// A cutscene context identifies cinematic dialogue, but not whether a voice file is playing.
+/// Tracks whether the game's TalkSubtitle addon is visible, which signals that
+/// native voice subtitles are being shown.
+///
+/// Visibility is latched for a short grace window so a voiced line is still
+/// recognised when the talk bubble updates a frame before the subtitle addon
+/// (alt-tab resume, back-to-back voiced cutscenes).
 /// </summary>
 public sealed class DialogueTester : IDisposable
 {
-    private readonly IAddonLifecycle addonLifecycle;
-    private readonly INotificationManager notificationManager;
-    private readonly ICondition condition;
+    /// <summary>How long a hidden subtitle still counts as "showing" to bridge frame races.</summary>
+    public static readonly TimeSpan SubtitleGraceWindow = TimeSpan.FromSeconds(1);
 
-    /// <summary>
-    /// True only while the game's TalkSubtitle addon is visible. This is the
-    /// line-level signal used to avoid duplicating native spoken subtitles.
-    /// </summary>
-    public volatile bool IsNativeVoiceSubtitleVisible;
+    private readonly IAddonLifecycle _addonLifecycle;
+    private bool _visible;
+    private long _lastVisibleTick;
 
-    public DialogueTester(IAddonLifecycle addonLifecycle, INotificationManager notificationManager, ICondition condition)
+    public DialogueTester(IAddonLifecycle addonLifecycle)
     {
-        this.addonLifecycle = addonLifecycle;
-        this.notificationManager = notificationManager;
-        this.condition = condition;
-
-        addonLifecycle.RegisterListener(AddonEvent.PostSetup, "Talk", OnTalkPostSetup);
-        addonLifecycle.RegisterListener(AddonEvent.PostSetup, "TalkSubtitle", OnTalkSubtitlePostSetup);
+        _addonLifecycle = addonLifecycle;
         addonLifecycle.RegisterListener(AddonEvent.PostUpdate, "TalkSubtitle", OnTalkSubtitleUpdate);
+        addonLifecycle.RegisterListener(AddonEvent.PostHide, "TalkSubtitle", OnTalkSubtitleHide);
     }
 
     public void Dispose()
     {
-        addonLifecycle.UnregisterListener(AddonEvent.PostSetup, "Talk", OnTalkPostSetup);
-        addonLifecycle.UnregisterListener(AddonEvent.PostSetup, "TalkSubtitle", OnTalkSubtitlePostSetup);
-        addonLifecycle.UnregisterListener(AddonEvent.PostUpdate, "TalkSubtitle", OnTalkSubtitleUpdate);
+        _addonLifecycle.UnregisterListener(AddonEvent.PostUpdate, "TalkSubtitle", OnTalkSubtitleUpdate);
+        _addonLifecycle.UnregisterListener(AddonEvent.PostHide, "TalkSubtitle", OnTalkSubtitleHide);
     }
 
-    private unsafe void OnTalkPostSetup(AddonEvent type, AddonArgs args)
+    /// <summary>True only while the game's TalkSubtitle addon was visible on its last update.</summary>
+    public bool IsNativeVoiceSubtitleVisible => Volatile.Read(ref _visible);
+
+    /// <summary>
+    /// True if subtitles are visible now or were visible within
+    /// <see cref="SubtitleGraceWindow"/>. Use this to decide whether a line is a
+    /// native voiced subtitle; the grace window bridges the one-frame gap between
+    /// the talk bubble and the subtitle addon.
+    /// </summary>
+    public bool IsNativeVoiceSubtitleActive()
     {
-        if (!HasValidSetupValues(args))
-            return;
+        if (IsNativeVoiceSubtitleVisible)
+            return true;
 
-        var addon = (AddonTalk*)args.Addon.Address;
-        if (addon == null)
-            return;
-
-        ReportDialogue("Talk", ReadTextNode(addon->AtkTextNode228));
-    }
-
-    private unsafe void OnTalkSubtitlePostSetup(AddonEvent type, AddonArgs args)
-    {
-        if (!HasValidSetupValues(args))
-            return;
-
-        var addon = (AddonTalkSubtitle*)args.Addon.Address;
-        if (addon == null)
-            return;
-
-        ReportDialogue("TalkSubtitle", addon->SubtitleText.ToString().Trim());
+        return Stopwatch.GetElapsedTime(Volatile.Read(ref _lastVisibleTick)) < SubtitleGraceWindow;
     }
 
     private unsafe void OnTalkSubtitleUpdate(AddonEvent type, AddonArgs args)
     {
         var addon = (AtkUnitBase*)args.Addon.Address;
-        IsNativeVoiceSubtitleVisible = addon != null && addon->IsVisible;
+        var visible = addon != null && addon->IsVisible;
+        Volatile.Write(ref _visible, visible);
+        if (visible)
+            Volatile.Write(ref _lastVisibleTick, Stopwatch.GetTimestamp());
     }
 
-    /// <summary>
-    /// PostSetup provides AddonSetupArgs. Validate its AtkValue array before accessing
-    /// the initialized addon data to avoid reading an incomplete setup payload.
-    /// </summary>
-    private static bool HasValidSetupValues(AddonArgs args)
+    private void OnTalkSubtitleHide(AddonEvent type, AddonArgs args)
     {
-        return args is AddonSetupArgs setup
-            && args.Addon != nint.Zero
-            && setup.AtkValueCount > 0
-            && setup.AtkValues != nint.Zero;
-    }
-
-    private bool IsInCutscene()
-    {
-        return condition[ConditionFlag.OccupiedInCutSceneEvent]
-            || condition[ConditionFlag.WatchingCutscene]
-            || condition[ConditionFlag.WatchingCutscene78];
-    }
-
-    private void ReportDialogue(string addonName, string text)
-    {
-        var cutscene = IsInCutscene();
-        var notification = new Notification
-        {
-            Type = cutscene ? NotificationType.Warning : NotificationType.Info,
-            Title = cutscene ? "TTS Dialogue Detector: CUTSCENE DIALOGUE" : "TTS Dialogue Detector: NPC DIALOGUE",
-            Content = string.IsNullOrWhiteSpace(text) ? addonName : text,
-            InitialDuration = TimeSpan.FromSeconds(3),
-        };
-
-        notificationManager.AddNotification(notification);
-    }
-
-    private static unsafe string ReadTextNode(AtkTextNode* textNode)
-    {
-        if (textNode == null)
-            return string.Empty;
-
-        return textNode->NodeText.StringPtr.AsDalamudSeString().TextValue
-            .Trim()
-            .Replace("\n", string.Empty)
-            .Replace("\r", string.Empty);
+        // The addon was hidden - clear the latch so the subtitle signal cannot
+        // remain stuck in the visible state after the voiced line ends.
+        Volatile.Write(ref _visible, false);
     }
 }

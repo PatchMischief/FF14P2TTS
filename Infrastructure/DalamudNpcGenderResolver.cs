@@ -2,6 +2,10 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using Dalamud.Plugin.Services;
 using FF14P2TTS.Application;
 using Lumina.Excel.Sheets;
@@ -11,6 +15,11 @@ namespace FF14P2TTS.Infrastructure;
 /// <summary>Dalamud data-sheet implementation of NPC gender lookups.</summary>
 public sealed class DalamudNpcGenderResolver : INpcGenderResolver
 {
+    private const string FandomApiBaseUrl = "https://finalfantasy.fandom.com/api.php";
+    private static readonly HttpClient HttpClient = new();
+    private static readonly Regex GenderFieldRegex = new(
+        @"^\s*\|\s*(?:gender|sex)\s*=\s*([^\r\n|]+)",
+        RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled);
     // Dialogue uses shortened display names for a few NPCs, which do not always
     // match the name stored in ENpcResident. Keep only verified fallbacks here.
     private static readonly IReadOnlyDictionary<string, NpcGender> KnownGenderOverrides =
@@ -24,6 +33,7 @@ public sealed class DalamudNpcGenderResolver : INpcGenderResolver
     private readonly IPluginLog _log;
     private readonly Configuration _configuration;
     private readonly ConcurrentDictionary<string, NpcGender> _cache = new();
+    private readonly ConcurrentDictionary<string, byte> _fandomLookups = new();
 
     public DalamudNpcGenderResolver(IDataManager dataManager, IPluginLog log, Configuration configuration)
     {
@@ -122,6 +132,115 @@ public sealed class DalamudNpcGenderResolver : INpcGenderResolver
 
         _cache[speakerName] = NpcGender.Unknown;
         _log.Debug($"[FF14P2TTS] '{speakerName}' not found in ENpcResident");
+        return NpcGender.Unknown;
+    }
+
+    public void RequestGenderLookup(string speakerName)
+    {
+        if (string.IsNullOrWhiteSpace(speakerName)
+            || _configuration.NpcGenderOverrides.ContainsKey(speakerName)
+            || KnownGenderOverrides.ContainsKey(speakerName)
+            || _fandomLookups.TryAdd(speakerName, 0) == false)
+            return;
+
+        _ = LookupFandomGenderAsync(speakerName);
+    }
+
+    public void Forget(string speakerName)
+    {
+        if (string.IsNullOrWhiteSpace(speakerName))
+            return;
+
+        _cache.TryRemove(speakerName, out _);
+        _fandomLookups.TryRemove(speakerName, out _);
+    }
+
+    private async Task LookupFandomGenderAsync(string speakerName)
+    {
+        try
+        {
+            var searchUrl =
+                $"{FandomApiBaseUrl}?action=query&list=search&srsearch={Uri.EscapeDataString(speakerName)}&srlimit=1&format=json";
+            using var searchResponse = await HttpClient.GetAsync(searchUrl).ConfigureAwait(false);
+            if (!searchResponse.IsSuccessStatusCode)
+                return;
+
+            using var searchDocument = JsonDocument.Parse(
+                await searchResponse.Content.ReadAsStreamAsync().ConfigureAwait(false));
+            if (!searchDocument.RootElement.TryGetProperty("query", out var query)
+                || !query.TryGetProperty("search", out var results)
+                || results.GetArrayLength() == 0)
+                return;
+
+            var pageTitle = results[0].GetProperty("title").GetString();
+            if (string.IsNullOrWhiteSpace(pageTitle))
+                return;
+
+            var titleUrl =
+                $"{FandomApiBaseUrl}?action=query&prop=revisions&titles={Uri.EscapeDataString(pageTitle)}&rvprop=content&rvslots=main&format=json";
+            using var pageResponse = await HttpClient.GetAsync(titleUrl).ConfigureAwait(false);
+            if (!pageResponse.IsSuccessStatusCode)
+                return;
+
+            using var pageDocument = JsonDocument.Parse(
+                await pageResponse.Content.ReadAsStreamAsync().ConfigureAwait(false));
+            var wikitext = ExtractWikitext(pageDocument.RootElement);
+            var gender = ParseGender(wikitext);
+            if (gender == NpcGender.Unknown)
+                return;
+
+            _cache[speakerName] = gender;
+            _log.Debug($"[FF14P2TTS] Fandom gender: '{speakerName}' -> {gender}");
+        }
+        catch (Exception ex)
+        {
+            _log.Debug($"[FF14P2TTS] Fandom gender lookup failed for '{speakerName}': {ex.Message}");
+        }
+    }
+
+    private static string? ExtractWikitext(JsonElement root)
+    {
+        if (!root.TryGetProperty("query", out var query)
+            || !query.TryGetProperty("pages", out var pages))
+            return null;
+
+        foreach (var page in pages.EnumerateObject())
+        {
+            if (!page.Value.TryGetProperty("revisions", out var revisions)
+                || revisions.GetArrayLength() == 0)
+                continue;
+
+            var revision = revisions[0];
+            if (!revision.TryGetProperty("slots", out var slots)
+                || !slots.TryGetProperty("main", out var main))
+                continue;
+
+            if (main.TryGetProperty("*", out var legacyContent))
+                return legacyContent.GetString();
+            if (main.TryGetProperty("content", out var content))
+                return content.GetString();
+        }
+
+        return null;
+    }
+
+    private static NpcGender ParseGender(string? wikitext)
+    {
+        if (string.IsNullOrWhiteSpace(wikitext))
+            return NpcGender.Unknown;
+
+        var match = GenderFieldRegex.Match(wikitext);
+        if (!match.Success)
+            return NpcGender.Unknown;
+
+        var value = match.Groups[1].Value.Trim();
+        if (value.Contains("female", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("f", StringComparison.OrdinalIgnoreCase))
+            return NpcGender.Female;
+        if (value.Contains("male", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("m", StringComparison.OrdinalIgnoreCase))
+            return NpcGender.Male;
+
         return NpcGender.Unknown;
     }
 
