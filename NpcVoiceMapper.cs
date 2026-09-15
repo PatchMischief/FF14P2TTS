@@ -13,6 +13,14 @@ public class NpcVoiceMapper
     
     private readonly Dictionary<(TtsEngine, NpcGender), Queue<string>> _shuffleBags = new();
 
+    // "Fewer Repeats" shuffle (see Spotify's shuffle engineering write-up):
+    // generate several mathematically-random sequences, score each for freshness,
+    // and pick the freshest so recently used voices are nudged toward the back.
+    private const int ShuffleCandidateCount = 16;
+    private const int RecentVoiceWindow = 8;
+    private readonly Dictionary<string, int> _lastUsedSequence = new(StringComparer.Ordinal);
+    private int _sequence;
+
     public NpcVoiceMapper(Configuration config)
     {
         _config = config;
@@ -174,43 +182,115 @@ public class NpcVoiceMapper
 
         if (!_shuffleBags.TryGetValue(key, out var bag) || bag.Count == 0)
         {
-            var pool = gender switch
-            {
-                NpcGender.Male => availableVoices
-                    .Where(v => string.Equals(v.Gender, "male", StringComparison.OrdinalIgnoreCase))
-                    .ToList(),
-                NpcGender.Female => availableVoices
-                    .Where(v => string.Equals(v.Gender, "female", StringComparison.OrdinalIgnoreCase)
-                        && (engine != TtsEngine.MicrosoftAzure
-                            || !string.Equals(v.Id, AzureAnaVoiceId, StringComparison.OrdinalIgnoreCase)))
-                    .ToList(),
-                _ => availableVoices.ToList()
-            };
-
-            if (pool.Count == 0 && engine == TtsEngine.Speechify)
-                pool = availableVoices
-                    .Where(v => string.Equals(v.Gender, "not_specified", StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-            else if (pool.Count == 0)
-                pool = availableVoices.ToList(); // fallback to all voices for Player2/Azure
-
+            var pool = BuildVoicePool(engine, gender, availableVoices);
             if (pool.Count == 0)
                 return string.Empty;
 
-            // Fisher-Yates Shuffle
-            int n = pool.Count;
-            while (n > 1)
-            {
-                n--;
-                int k = _rng.Next(n + 1);
-                (pool[k], pool[n]) = (pool[n], pool[k]);
-            }
-
-            bag = new Queue<string>(pool.Select(v => v.Id));
+            bag = new Queue<string>(OrderVoicesForFewerRepeats(pool).Select(v => v.Id));
             _shuffleBags[key] = bag;
         }
 
-        return bag.Dequeue();
+        var voiceId = bag.Dequeue();
+        MarkVoiceUsed(voiceId);
+        return voiceId;
+    }
+
+    private static List<VoiceInfo> BuildVoicePool(
+        TtsEngine engine,
+        NpcGender gender,
+        List<VoiceInfo> availableVoices)
+    {
+        var pool = gender switch
+        {
+            NpcGender.Male => availableVoices
+                .Where(v => string.Equals(v.Gender, "male", StringComparison.OrdinalIgnoreCase))
+                .ToList(),
+            NpcGender.Female => availableVoices
+                .Where(v => string.Equals(v.Gender, "female", StringComparison.OrdinalIgnoreCase)
+                    && (engine != TtsEngine.MicrosoftAzure
+                        || !string.Equals(v.Id, AzureAnaVoiceId, StringComparison.OrdinalIgnoreCase)))
+                .ToList(),
+            _ => availableVoices.ToList()
+        };
+
+        if (pool.Count == 0 && engine == TtsEngine.Speechify)
+            pool = availableVoices
+                .Where(v => string.Equals(v.Gender, "not_specified", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        else if (pool.Count == 0)
+            pool = availableVoices.ToList(); // fallback to all voices for Player2/Azure
+
+        return pool;
+    }
+
+    /// <summary>
+    /// Picks the freshest of several random orderings. Each candidate is a plain
+    /// Fisher-Yates shuffle, so the math stays random; we only choose the one that
+    /// pushes recently used voices toward the back.
+    /// </summary>
+    private List<VoiceInfo> OrderVoicesForFewerRepeats(List<VoiceInfo> pool)
+    {
+        if (pool.Count <= 1)
+            return pool;
+
+        var best = Shuffle(pool);
+        var bestScore = int.MinValue;
+        var recencyWindow = Math.Min(RecentVoiceWindow, pool.Count);
+
+        for (var attempt = 0; attempt < ShuffleCandidateCount; attempt++)
+        {
+            var candidate = Shuffle(pool);
+            var score = ScoreFreshness(candidate, recencyWindow);
+            if (score > bestScore)
+            {
+                bestScore = score;
+                best = candidate;
+            }
+        }
+
+        return best;
+    }
+
+    private int ScoreFreshness(List<VoiceInfo> candidate, int recencyWindow)
+    {
+        var score = 0;
+        for (var i = 0; i < candidate.Count; i++)
+        {
+            var recency = GetRecencyWeight(candidate[i].Id, recencyWindow);
+            if (recency > 0)
+                score -= recency * (candidate.Count - i); // earlier + more recent = bigger penalty
+        }
+
+        return score;
+    }
+
+    private int GetRecencyWeight(string voiceId, int recencyWindow)
+    {
+        if (!_lastUsedSequence.TryGetValue(voiceId, out var lastUsed))
+            return 0;
+
+        var age = _sequence - lastUsed;
+        return age < recencyWindow ? recencyWindow - age : 0;
+    }
+
+    private void MarkVoiceUsed(string voiceId)
+    {
+        _sequence++;
+        _lastUsedSequence[voiceId] = _sequence;
+    }
+
+    private List<VoiceInfo> Shuffle(List<VoiceInfo> pool)
+    {
+        var shuffled = new List<VoiceInfo>(pool);
+        var n = shuffled.Count;
+        while (n > 1)
+        {
+            n--;
+            var k = _rng.Next(n + 1);
+            (shuffled[k], shuffled[n]) = (shuffled[n], shuffled[k]);
+        }
+
+        return shuffled;
     }
 
     private string GetAzureFemaleDefaultVoice() => string.Equals(
