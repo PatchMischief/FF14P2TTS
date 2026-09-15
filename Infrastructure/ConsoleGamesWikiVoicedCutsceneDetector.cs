@@ -57,13 +57,14 @@ public sealed class ConsoleGamesWikiVoicedCutsceneDetector : IVoicedCutsceneDete
 
         if (!HasResolvableQuest(questNames))
         {
-            // No resolvable active quest names. Only treat this as "definitely not
-            // voiced" when the read was reliable and there were no quest slots at
-            // all. Any other case (game window inactive, unresolvable rows) is a
-            // data gap, so fail closed: report voiced so a native-voiced line is
-            // never spoken just because quest data was unreadable for a frame.
-            var reliableAndEmpty = questNames.Count == 0 && (_questReadAvailable?.Invoke() ?? false);
-            return Task.FromResult(!reliableAndEmpty);
+            // Data gap: no resolvable active quest names (game window inactive,
+            // QuestManager unavailable, or rows that don't resolve). We cannot
+            // positively classify the line as voiced, so fail open and let it
+            // speak. The coordinator's native subtitle signal remains the
+            // line-level safety net that still skips voiced cutscenes.
+            if (!(_questReadAvailable?.Invoke() ?? true))
+                _log.Debug("[FF14P2TTS] Voiced-cutscene classification skipped: quest read unavailable; failing open.");
+            return Task.FromResult(false);
         }
 
         return _lookups.GetOrAdd(key, _ => LookupActiveQuestPagesAsync(speaker, text, key, questNames));
