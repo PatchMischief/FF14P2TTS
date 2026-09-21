@@ -265,10 +265,10 @@ public sealed class SpeechifyTtsService : ITtsService, ISsmlSpeechProvider
 
     private async Task<string> BuildInputAsync(string text, double speed, CancellationToken ct)
     {
-        var content = text;
+        var content = SanitizeText(text);
         if (_config.SpeechifyUseEmotionTagging && !string.IsNullOrWhiteSpace(_config.GroqApiKey))
         {
-            var tagged = await _groqTagger.TagAsync(text, ct).ConfigureAwait(false);
+            var tagged = await _groqTagger.TagAsync(content, ct).ConfigureAwait(false);
             if (!string.IsNullOrWhiteSpace(tagged))
             {
                 content = tagged;
@@ -283,13 +283,34 @@ public sealed class SpeechifyTtsService : ITtsService, ISsmlSpeechProvider
         return BuildSsml(content, speed);
     }
 
+    /// <summary>
+    /// Strips FFXIV payload markers and any remaining XML-like text so it cannot
+    /// be mistaken for SSML markup by Speechify's parser.
+    /// </summary>
+    private static string SanitizeText(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return string.Empty;
+
+        // Strip SeString payload markers.
+        var sanitized = System.Text.RegularExpressions.Regex.Replace(
+            text,
+            @"\uE0BB.*?\uE0BC",
+            string.Empty);
+
+        // Replace FFXIV auto-translate markers.
+        sanitized = sanitized.Replace('\uE040', '[').Replace('\uE041', ']');
+
+        // Remove any remaining XML-like tags that would break SSML parsing.
+        sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"<[^>]+>", string.Empty);
+
+        return sanitized.Trim();
+    }
+
     private static string BuildSsml(string content, double speed)
     {
         var isTagged = content.Contains("<speechify:style", StringComparison.OrdinalIgnoreCase);
         var needsSpeed = Math.Abs(speed - 1.0) >= 0.01;
-
-        if (!isTagged && !needsSpeed)
-            return content;
 
         if (isTagged)
         {
@@ -301,6 +322,16 @@ public sealed class SpeechifyTtsService : ITtsService, ISsmlSpeechProvider
                 inner = $"<prosody rate=\"{rate}\">{content}</prosody>";
             }
             return $"<speak>{inner}</speak>";
+        }
+
+        if (!needsSpeed)
+        {
+            // Pass plain text through untouched unless it contains characters that
+            // Speechify would mistake for SSML markup.
+            if (content.IndexOfAny(new[] { '<', '>', '&' }) < 0)
+                return content;
+
+            return $"<speak>{System.Security.SecurityElement.Escape(content)}</speak>";
         }
 
         var escaped = System.Security.SecurityElement.Escape(content);

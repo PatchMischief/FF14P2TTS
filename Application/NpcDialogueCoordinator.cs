@@ -19,6 +19,9 @@ public sealed class NpcDialogueCoordinator
     private string _lastNpcSpeaker = string.Empty;
     private IDialoguePreloader? _preloader;
 
+    /// <summary>How long to wait for the TalkSubtitle addon to catch up before reading its visibility.</summary>
+    private static readonly TimeSpan SubtitleSettleDelay = TimeSpan.FromMilliseconds(100);
+
     public NpcDialogueCoordinator(
         Configuration configuration,
         ITtsServiceProvider ttsServices,
@@ -35,24 +38,35 @@ public sealed class NpcDialogueCoordinator
         _log = log;
     }
 
-    public async Task HandleAsync(string speaker, string text, bool nativeVoiceSubtitleActive)
+    public async Task HandleAsync(string speaker, string text, Func<bool> isNativeVoiceSubtitleVisible)
     {
         if (!_configuration.TtsEnabled)
             return;
 
-        _genderResolver.RequestGenderLookup(speaker);
-
         if (_configuration.SkipTtsDuringCutscenes)
         {
-            // The wiki is the authoritative classifier and is always consulted.
-            // The subtitle signal is only a safety net for lines the wiki cannot
-            // classify (e.g. while quest data is temporarily unreadable after
-            // alt-tab or between two back-to-back voiced cutscenes).
-            var wikiVoiced = await _voicedCutsceneDetector.IsVoicedAsync(speaker, text).ConfigureAwait(false);
-            if (wikiVoiced || nativeVoiceSubtitleActive)
+            // The wiki's voiced/unvoiced script is the source of truth. Its
+            // best-match classifier decides each line.
+            var classification = await _voicedCutsceneDetector.ClassifyAsync(speaker, text).ConfigureAwait(false);
+            if (classification == VoicedCutsceneClassification.Voiced)
             {
-                _log.Debug("[FF14P2TTS] Skipping voiced cutscene NPC TTS");
+                _log.Information("[FF14P2TTS] Skipping voiced cutscene NPC TTS (wiki classified as voiced)");
                 return;
+            }
+
+            // When the wiki has no data (quest read unavailable, or the line is
+            // missing from the script), the native subtitle is the only runtime
+            // signal for voiced lines. Wait a couple of frames for the subtitle
+            // addon to catch up with the talk bubble, then read its CURRENT
+            // visibility directly (never a stale latch).
+            if (classification == VoicedCutsceneClassification.Unknown)
+            {
+                await Task.Delay(SubtitleSettleDelay).ConfigureAwait(false);
+                if (isNativeVoiceSubtitleVisible())
+                {
+                    _log.Information("[FF14P2TTS] Skipping voiced cutscene NPC TTS (native subtitle visible)");
+                    return;
+                }
             }
         }
 
@@ -63,7 +77,8 @@ public sealed class NpcDialogueCoordinator
             return;
         }
 
-        var voiceId = ResolveVoice(speaker);
+        var gender = await _genderResolver.GetGenderAsync(speaker).ConfigureAwait(false);
+        var voiceId = ResolveVoice(speaker, gender);
         _ = _ttsServices.Active.SpeakAsync(textToSpeak, voice: voiceId);
     }
 
@@ -84,7 +99,7 @@ public sealed class NpcDialogueCoordinator
         return $"{speaker} says: {text}";
     }
 
-    private string ResolveVoice(string speaker)
+    private string ResolveVoice(string speaker, NpcGender? genderOverride = null)
     {
         var isAzure = _configuration.ActiveEngine == TtsEngine.MicrosoftAzure;
         var isElevenLabs = _configuration.ActiveEngine == TtsEngine.ElevenLabs;
@@ -100,7 +115,7 @@ public sealed class NpcDialogueCoordinator
         if (!usesGenderedVoices)
             return GetUnisexVoice();
 
-        var gender = _genderResolver.GetGender(speaker);
+        var gender = genderOverride ?? _genderResolver.GetGender(speaker);
         var usesPerNpcVoices = UsePerNpcVoices();
         if (usesPerNpcVoices && _cachedVoiceList is not null)
         {
@@ -187,7 +202,7 @@ public sealed class NpcDialogueCoordinator
         {
             var voices = await _ttsServices.Active.GetAvailableVoicesRawAsync();
             _cachedVoiceList = voices
-                .Where(voice => voice.RawLanguage is "american_english" or "british_english")
+                .Where(voice => voice.Language.StartsWith("en", StringComparison.OrdinalIgnoreCase))
                 .ToList();
             if (_cachedVoiceList.Count == 0)
                 _cachedVoiceList = voices;

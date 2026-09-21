@@ -27,6 +27,18 @@ public sealed class DalamudNpcGenderResolver : INpcGenderResolver
         {
             ["Gaia"] = NpcGender.Female,
             ["Dulia-Chai"] = NpcGender.Female,
+            // Main cast and recurring NPCs whose ENpcBase gender is wrong,
+            // ambiguous, or missing in the game data.
+            ["Alphinaud"] = NpcGender.Male,
+            ["Alisaie"] = NpcGender.Female,
+            ["Y'shtola"] = NpcGender.Female,
+            ["Thancred"] = NpcGender.Male,
+            ["Urianger"] = NpcGender.Male,
+            ["Estinien"] = NpcGender.Male,
+            ["G'raha Tia"] = NpcGender.Male,
+            ["Krile"] = NpcGender.Female,
+            ["Tataru"] = NpcGender.Female,
+            ["Tiamat"] = NpcGender.Female,
         };
 
     private readonly IDataManager _dataManager;
@@ -34,6 +46,7 @@ public sealed class DalamudNpcGenderResolver : INpcGenderResolver
     private readonly Configuration _configuration;
     private readonly ConcurrentDictionary<string, NpcGender> _cache = new();
     private readonly ConcurrentDictionary<string, byte> _fandomLookups = new();
+    private readonly ConcurrentDictionary<string, Task<NpcGender>> _genderLookups = new(StringComparer.OrdinalIgnoreCase);
 
     public DalamudNpcGenderResolver(IDataManager dataManager, IPluginLog log, Configuration configuration)
     {
@@ -127,7 +140,7 @@ public sealed class DalamudNpcGenderResolver : INpcGenderResolver
             }
 
             if (exactGenders.Count > 1)
-                _log.Warning($"[FF14P2TTS] Ambiguous NPC gender for '{speakerName}'; add a verified override");
+                _log.Debug($"[FF14P2TTS] Ambiguous NPC gender for '{speakerName}'; will try the wiki");
         }
 
         _cache[speakerName] = NpcGender.Unknown;
@@ -144,6 +157,27 @@ public sealed class DalamudNpcGenderResolver : INpcGenderResolver
             return;
 
         _ = LookupFandomGenderAsync(speakerName);
+    }
+
+    public async Task<NpcGender> GetGenderAsync(string speakerName)
+    {
+        if (string.IsNullOrWhiteSpace(speakerName))
+            return NpcGender.Unknown;
+
+        var gender = GetGender(speakerName);
+        if (gender != NpcGender.Unknown)
+            return gender;
+
+        // The game data was ambiguous or missing; fall back to the wiki and
+        // await the result so the first line gets the correct gender.
+        var lookup = _genderLookups.GetOrAdd(speakerName, GetFandomGenderAsync);
+        return await lookup.ConfigureAwait(false);
+    }
+
+    private async Task<NpcGender> GetFandomGenderAsync(string speakerName)
+    {
+        await LookupFandomGenderAsync(speakerName).ConfigureAwait(false);
+        return _cache.TryGetValue(speakerName, out var cached) ? cached : NpcGender.Unknown;
     }
 
     public void Forget(string speakerName)

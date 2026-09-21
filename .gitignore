@@ -14,3 +14,6 @@ obj/
 
 # Graphify output (generated knowledge-graph artifacts) — do not commit.
 graphify-out/
+
+# Azure voice catalog reference (generated; built into the plugin at compile time).
+azure_english_voices.json

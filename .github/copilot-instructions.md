@@ -1,5 +1,11 @@
 # Copilot instructions for FF14P2TTS
 
+## Session Workflow (always on)
+
+- **Graphify first.** For any question about this repo's architecture, structure, or component relationships, run `python -m graphify query "<question>"` (or `python -m graphify path "A" "B"` / `python -m graphify explain "X"`) when `graphify-out/graph.json` exists, and prefer that scoped subgraph over reading source files.
+- **Auto-use skills.** Match each task to a loaded skill and follow it (`ff14p2tts-dev-loop`, `graphify`, `run-tests`, `writing-mstest-tests`, MSBuild skills).
+- **Change loop.** After every change: increment the `<Version>` patch in `FF14P2TTS.csproj` by 1, run `dotnet build FF14P2TTS.csproj -c Release`, then run `python -m graphify update .` (add `--force` after upgrading graphify itself).
+
 ## Project overview
 
 FF14P2TTS is a Dalamud plugin for Final Fantasy XIV that reads chat and NPC dialogue aloud. It targets `net10.0-windows`, uses Dalamud API level 15, and supports two interchangeable TTS backends:

@@ -1,6 +1,7 @@
 using System;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Security;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -106,6 +107,7 @@ public sealed class GroqEmotionTagger
         tagged = Regex.Replace(tagged, @"^```(?:xml|ssml)?\s*", string.Empty, RegexOptions.IgnoreCase);
         tagged = Regex.Replace(tagged, @"\s*```$", string.Empty);
 
+        // Strip any <speak>...</speak> wrapper the model may have added.
         var openIndex = tagged.IndexOf("<speak", StringComparison.OrdinalIgnoreCase);
         if (openIndex >= 0)
         {
@@ -117,8 +119,54 @@ public sealed class GroqEmotionTagger
         if (tagged.EndsWith("</speak>", StringComparison.OrdinalIgnoreCase))
             tagged = tagged[..^"</speak>".Length];
 
-        return tagged.Contains("<speechify:style", StringComparison.OrdinalIgnoreCase)
-            ? tagged.Trim()
-            : null;
+        if (!tagged.Contains("<speechify:style", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        // The model can re-emit unescaped XML-significant characters from the
+        // source text (for example an FFXIV stage direction like <sigh>), which
+        // Speechify's SSML parser would treat as a tag. Rebuild the output by
+        // keeping only valid <speechify:style> tags and escaping everything else.
+        return RebuildTagged(tagged).Trim();
+    }
+
+    private static readonly Regex StyleTagPattern = new(
+        @"<speechify:style\b[^>]*>|</speechify:style\s*>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static string RebuildTagged(string tagged)
+    {
+        var result = new StringBuilder();
+        var position = 0;
+        var depth = 0;
+
+        foreach (Match match in StyleTagPattern.Matches(tagged))
+        {
+            if (match.Index > position)
+                result.Append(SecurityElement.Escape(tagged[position..match.Index]));
+
+            if (match.Value.StartsWith("</", StringComparison.Ordinal))
+            {
+                if (depth > 0)
+                {
+                    result.Append(match.Value);
+                    depth--;
+                }
+            }
+            else
+            {
+                result.Append(match.Value);
+                depth++;
+            }
+
+            position = match.Index + match.Length;
+        }
+
+        if (position < tagged.Length)
+            result.Append(SecurityElement.Escape(tagged[position..]));
+
+        while (depth-- > 0)
+            result.Append("</speechify:style>");
+
+        return result.ToString();
     }
 }

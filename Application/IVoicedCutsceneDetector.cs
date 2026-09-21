@@ -2,9 +2,21 @@ namespace FF14P2TTS.Application;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
+public enum VoicedCutsceneClassification
+{
+    /// <summary>The wiki was consulted and the line is not inside a voiced block.</summary>
+    NotVoiced,
+
+    /// <summary>The line appears inside a voiced cutscene block and must be skipped.</summary>
+    Voiced,
+
+    /// <summary>The wiki could not classify the line (quest data unavailable/unresolvable).</summary>
+    Unknown,
+}
+
 public interface IVoicedCutsceneDetector
 {
-    Task<bool> IsVoicedAsync(string speaker, string text);
+    Task<VoicedCutsceneClassification> ClassifyAsync(string speaker, string text);
 
     /// <summary>
     /// Returns the wiki-scripted dialogue boxes for the given quest's unvoiced

@@ -23,6 +23,7 @@ public class AzureTtsService : ITtsService
 {
     private const string GroqApiUrl = "https://api.groq.com/openai/v1/chat/completions";
     private static readonly HttpClient GroqHttpClient = new();
+    private static readonly HttpClient VoiceListHttpClient = new();
     private static readonly string[] AzureEmotions =
     {
         "cheerful", "excited", "sad", "angry", "terrified", "fearful", "whispering",
@@ -38,252 +39,1115 @@ public class AzureTtsService : ITtsService
     private readonly DuplicateMessageFilter _duplicateFilter = new();
     private readonly object _lock = new();
 
-    // Well-known Azure neural voices (English)
+    // Full list of Azure neural voices (all English locales).
     public static readonly List<VoiceInfo> KnownEnglishVoices = new()
     {
         new()
         {
-            Id = "en-US-AriaNeural",
-            Name = "Aria",
-            RawLanguage = "american_english",
-            Language = "EN-US",
-            Gender = "female",
-            DisplayName = "Aria (EN-US) [F]",
+            Id = "en-US-AdamMultilingualNeural",
+            Name = "AdamMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "male",
+            DisplayName = "AdamMultilingual (en-US) [M]",
         },
         new()
         {
-            Id = "en-US-JennyNeural",
-            Name = "Jenny",
-            RawLanguage = "american_english",
-            Language = "EN-US",
-            Gender = "female",
-            DisplayName = "Jenny (EN-US) [F]",
+            Id = "en-US-AlloyTurboMultilingualNeural",
+            Name = "AlloyTurboMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "male",
+            DisplayName = "AlloyTurboMultilingual (en-US) [M]",
         },
         new()
         {
-            Id = "en-US-JaneNeural",
-            Name = "Jane",
-            RawLanguage = "american_english",
-            Language = "EN-US",
+            Id = "en-US-AmandaMultilingualNeural",
+            Name = "AmandaMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
             Gender = "female",
-            DisplayName = "Jane (EN-US) [F]",
-        },
-        new()
-        {
-            Id = "en-US-NancyNeural",
-            Name = "Nancy",
-            RawLanguage = "american_english",
-            Language = "EN-US",
-            Gender = "female",
-            DisplayName = "Nancy (EN-US) [F]",
+            DisplayName = "AmandaMultilingual (en-US) [F]",
         },
         new()
         {
             Id = "en-US-AmberNeural",
             Name = "Amber",
-            RawLanguage = "american_english",
-            Language = "EN-US",
+            RawLanguage = "english",
+            Language = "en-US",
             Gender = "female",
-            DisplayName = "Amber (EN-US) [F]",
-        },
-        new()
-        {
-            Id = "en-US-AshleyNeural",
-            Name = "Ashley",
-            RawLanguage = "american_english",
-            Language = "EN-US",
-            Gender = "female",
-            DisplayName = "Ashley (EN-US) [F]",
-        },
-        new()
-        {
-            Id = "en-US-SaraNeural",
-            Name = "Sara",
-            RawLanguage = "american_english",
-            Language = "EN-US",
-            Gender = "female",
-            DisplayName = "Sara (EN-US) [F]",
+            DisplayName = "Amber (en-US) [F]",
         },
         new()
         {
             Id = "en-US-AnaNeural",
             Name = "Ana",
-            RawLanguage = "american_english",
-            Language = "EN-US",
+            RawLanguage = "english",
+            Language = "en-US",
             Gender = "female",
-            DisplayName = "Ana (EN-US) [F]",
+            DisplayName = "Ana (en-US) [F]",
         },
         new()
         {
-            Id = "en-US-MichelleNeural",
-            Name = "Michelle",
-            RawLanguage = "american_english",
-            Language = "EN-US",
-            Gender = "female",
-            DisplayName = "Michelle (EN-US) [F]",
-        },
-        new()
-        {
-            Id = "en-US-DavisNeural",
-            Name = "Davis",
-            RawLanguage = "american_english",
-            Language = "EN-US",
+            Id = "en-US-AndrewMultilingualNeural",
+            Name = "AndrewMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
             Gender = "male",
-            DisplayName = "Davis (EN-US) [M]",
-        },
-        new()
-        {
-            Id = "en-US-GuyNeural",
-            Name = "Guy",
-            RawLanguage = "american_english",
-            Language = "EN-US",
-            Gender = "male",
-            DisplayName = "Guy (EN-US) [M]",
-        },
-        new()
-        {
-            Id = "en-US-TonyNeural",
-            Name = "Tony",
-            RawLanguage = "american_english",
-            Language = "EN-US",
-            Gender = "male",
-            DisplayName = "Tony (EN-US) [M]",
-        },
-        new()
-        {
-            Id = "en-US-JasonNeural",
-            Name = "Jason",
-            RawLanguage = "american_english",
-            Language = "EN-US",
-            Gender = "male",
-            DisplayName = "Jason (EN-US) [M]",
-        },
-        new()
-        {
-            Id = "en-US-JacobNeural",
-            Name = "Jacob",
-            RawLanguage = "american_english",
-            Language = "EN-US",
-            Gender = "male",
-            DisplayName = "Jacob (EN-US) [M]",
-        },
-        new()
-        {
-            Id = "en-US-EricNeural",
-            Name = "Eric",
-            RawLanguage = "american_english",
-            Language = "EN-US",
-            Gender = "male",
-            DisplayName = "Eric (EN-US) [M]",
-        },
-        new()
-        {
-            Id = "en-US-SteffanNeural",
-            Name = "Steffan",
-            RawLanguage = "american_english",
-            Language = "EN-US",
-            Gender = "male",
-            DisplayName = "Steffan (EN-US) [M]",
-        },
-        new()
-        {
-            Id = "en-US-RogerNeural",
-            Name = "Roger",
-            RawLanguage = "american_english",
-            Language = "EN-US",
-            Gender = "male",
-            DisplayName = "Roger (EN-US) [M]",
+            DisplayName = "AndrewMultilingual (en-US) [M]",
         },
         new()
         {
             Id = "en-US-AndrewNeural",
             Name = "Andrew",
-            RawLanguage = "american_english",
-            Language = "EN-US",
+            RawLanguage = "english",
+            Language = "en-US",
             Gender = "male",
-            DisplayName = "Andrew (EN-US) [M]",
+            DisplayName = "Andrew (en-US) [M]",
+        },
+        new()
+        {
+            Id = "en-US-AriaNeural",
+            Name = "Aria",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "female",
+            DisplayName = "Aria (en-US) [F]",
+        },
+        new()
+        {
+            Id = "en-US-AshTurboMultilingualNeural",
+            Name = "AshTurboMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "male",
+            DisplayName = "AshTurboMultilingual (en-US) [M]",
+        },
+        new()
+        {
+            Id = "en-US-AshleyNeural",
+            Name = "Ashley",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "female",
+            DisplayName = "Ashley (en-US) [F]",
+        },
+        new()
+        {
+            Id = "en-US-AvaMultilingualNeural",
+            Name = "AvaMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "female",
+            DisplayName = "AvaMultilingual (en-US) [F]",
+        },
+        new()
+        {
+            Id = "en-US-AvaNeural",
+            Name = "Ava",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "female",
+            DisplayName = "Ava (en-US) [F]",
+        },
+        new()
+        {
+            Id = "en-US-BlueNeural",
+            Name = "Blue",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "not_specified",
+            DisplayName = "Blue (en-US) [?]",
+        },
+        new()
+        {
+            Id = "en-US-BrandonMultilingualNeural",
+            Name = "BrandonMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "male",
+            DisplayName = "BrandonMultilingual (en-US) [M]",
+        },
+        new()
+        {
+            Id = "en-US-BrandonNeural",
+            Name = "Brandon",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "male",
+            DisplayName = "Brandon (en-US) [M]",
+        },
+        new()
+        {
+            Id = "en-US-BrianMultilingualNeural",
+            Name = "BrianMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "male",
+            DisplayName = "BrianMultilingual (en-US) [M]",
         },
         new()
         {
             Id = "en-US-BrianNeural",
             Name = "Brian",
-            RawLanguage = "american_english",
-            Language = "EN-US",
+            RawLanguage = "english",
+            Language = "en-US",
             Gender = "male",
-            DisplayName = "Brian (EN-US) [M]",
+            DisplayName = "Brian (en-US) [M]",
+        },
+        new()
+        {
+            Id = "en-US-ChristopherMultilingualNeural",
+            Name = "ChristopherMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "male",
+            DisplayName = "ChristopherMultilingual (en-US) [M]",
         },
         new()
         {
             Id = "en-US-ChristopherNeural",
             Name = "Christopher",
-            RawLanguage = "american_english",
-            Language = "EN-US",
+            RawLanguage = "english",
+            Language = "en-US",
             Gender = "male",
-            DisplayName = "Christopher (EN-US) [M]",
+            DisplayName = "Christopher (en-US) [M]",
         },
-        // UK English voices
         new()
         {
-            Id = "en-GB-SoniaNeural",
-            Name = "Sonia",
-            RawLanguage = "british_english",
-            Language = "EN-UK",
+            Id = "en-US-CoraMultilingualNeural",
+            Name = "CoraMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
             Gender = "female",
-            DisplayName = "Sonia (EN-UK) [F]",
+            DisplayName = "CoraMultilingual (en-US) [F]",
         },
         new()
         {
-            Id = "en-GB-MaisieNeural",
-            Name = "Maisie",
-            RawLanguage = "british_english",
-            Language = "EN-UK",
+            Id = "en-US-CoraNeural",
+            Name = "Cora",
+            RawLanguage = "english",
+            Language = "en-US",
             Gender = "female",
-            DisplayName = "Maisie (EN-UK) [F]",
+            DisplayName = "Cora (en-US) [F]",
         },
         new()
         {
-            Id = "en-GB-LibbyNeural",
-            Name = "Libby",
-            RawLanguage = "british_english",
-            Language = "EN-UK",
-            Gender = "female",
-            DisplayName = "Libby (EN-UK) [F]",
-        },
-        new()
-        {
-            Id = "en-GB-RyanNeural",
-            Name = "Ryan",
-            RawLanguage = "british_english",
-            Language = "EN-UK",
+            Id = "en-US-DavisMultilingualNeural",
+            Name = "DavisMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
             Gender = "male",
-            DisplayName = "Ryan (EN-UK) [M]",
+            DisplayName = "DavisMultilingual (en-US) [M]",
         },
         new()
         {
-            Id = "en-GB-ThomasNeural",
-            Name = "Thomas",
-            RawLanguage = "british_english",
-            Language = "EN-UK",
+            Id = "en-US-DavisNeural",
+            Name = "Davis",
+            RawLanguage = "english",
+            Language = "en-US",
             Gender = "male",
-            DisplayName = "Thomas (EN-UK) [M]",
+            DisplayName = "Davis (en-US) [M]",
+        },
+        new()
+        {
+            Id = "en-US-DerekMultilingualNeural",
+            Name = "DerekMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "male",
+            DisplayName = "DerekMultilingual (en-US) [M]",
+        },
+        new()
+        {
+            Id = "en-US-DustinMultilingualNeural",
+            Name = "DustinMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "male",
+            DisplayName = "DustinMultilingual (en-US) [M]",
+        },
+        new()
+        {
+            Id = "en-US-EchoTurboMultilingualNeural",
+            Name = "EchoTurboMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "male",
+            DisplayName = "EchoTurboMultilingual (en-US) [M]",
+        },
+        new()
+        {
+            Id = "en-US-ElizabethNeural",
+            Name = "Elizabeth",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "female",
+            DisplayName = "Elizabeth (en-US) [F]",
+        },
+        new()
+        {
+            Id = "en-US-EmmaMultilingualNeural",
+            Name = "EmmaMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "female",
+            DisplayName = "EmmaMultilingual (en-US) [F]",
+        },
+        new()
+        {
+            Id = "en-US-EmmaNeural",
+            Name = "Emma",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "female",
+            DisplayName = "Emma (en-US) [F]",
+        },
+        new()
+        {
+            Id = "en-US-EricNeural",
+            Name = "Eric",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "male",
+            DisplayName = "Eric (en-US) [M]",
+        },
+        new()
+        {
+            Id = "en-US-EvelynMultilingualNeural",
+            Name = "EvelynMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "female",
+            DisplayName = "EvelynMultilingual (en-US) [F]",
+        },
+        new()
+        {
+            Id = "en-US-FableTurboMultilingualNeural",
+            Name = "FableTurboMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "not_specified",
+            DisplayName = "FableTurboMultilingual (en-US) [?]",
+        },
+        new()
+        {
+            Id = "en-US-GuyNeural",
+            Name = "Guy",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "male",
+            DisplayName = "Guy (en-US) [M]",
+        },
+        new()
+        {
+            Id = "en-US-JacobNeural",
+            Name = "Jacob",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "male",
+            DisplayName = "Jacob (en-US) [M]",
+        },
+        new()
+        {
+            Id = "en-US-JaneNeural",
+            Name = "Jane",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "female",
+            DisplayName = "Jane (en-US) [F]",
+        },
+        new()
+        {
+            Id = "en-US-JasonNeural",
+            Name = "Jason",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "male",
+            DisplayName = "Jason (en-US) [M]",
+        },
+        new()
+        {
+            Id = "en-US-JennyMultilingualNeural",
+            Name = "JennyMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "female",
+            DisplayName = "JennyMultilingual (en-US) [F]",
+        },
+        new()
+        {
+            Id = "en-US-JennyNeural",
+            Name = "Jenny",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "female",
+            DisplayName = "Jenny (en-US) [F]",
+        },
+        new()
+        {
+            Id = "en-US-KaiNeural",
+            Name = "Kai",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "male",
+            DisplayName = "Kai (en-US) [M]",
+        },
+        new()
+        {
+            Id = "en-US-LewisMultilingualNeural",
+            Name = "LewisMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "male",
+            DisplayName = "LewisMultilingual (en-US) [M]",
+        },
+        new()
+        {
+            Id = "en-US-LolaMultilingualNeural",
+            Name = "LolaMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "female",
+            DisplayName = "LolaMultilingual (en-US) [F]",
+        },
+        new()
+        {
+            Id = "en-US-LunaNeural",
+            Name = "Luna",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "female",
+            DisplayName = "Luna (en-US) [F]",
+        },
+        new()
+        {
+            Id = "en-US-MichelleNeural",
+            Name = "Michelle",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "female",
+            DisplayName = "Michelle (en-US) [F]",
+        },
+        new()
+        {
+            Id = "en-US-MonicaNeural",
+            Name = "Monica",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "female",
+            DisplayName = "Monica (en-US) [F]",
+        },
+        new()
+        {
+            Id = "en-US-NancyMultilingualNeural",
+            Name = "NancyMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "female",
+            DisplayName = "NancyMultilingual (en-US) [F]",
+        },
+        new()
+        {
+            Id = "en-US-NancyNeural",
+            Name = "Nancy",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "female",
+            DisplayName = "Nancy (en-US) [F]",
+        },
+        new()
+        {
+            Id = "en-US-NovaTurboMultilingualNeural",
+            Name = "NovaTurboMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "female",
+            DisplayName = "NovaTurboMultilingual (en-US) [F]",
+        },
+        new()
+        {
+            Id = "en-US-OnyxTurboMultilingualNeural",
+            Name = "OnyxTurboMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "male",
+            DisplayName = "OnyxTurboMultilingual (en-US) [M]",
+        },
+        new()
+        {
+            Id = "en-US-PhoebeMultilingualNeural",
+            Name = "PhoebeMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "female",
+            DisplayName = "PhoebeMultilingual (en-US) [F]",
+        },
+        new()
+        {
+            Id = "en-US-RogerNeural",
+            Name = "Roger",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "male",
+            DisplayName = "Roger (en-US) [M]",
+        },
+        new()
+        {
+            Id = "en-US-RyanMultilingualNeural",
+            Name = "RyanMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "male",
+            DisplayName = "RyanMultilingual (en-US) [M]",
+        },
+        new()
+        {
+            Id = "en-US-SamuelMultilingualNeural",
+            Name = "SamuelMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "male",
+            DisplayName = "SamuelMultilingual (en-US) [M]",
+        },
+        new()
+        {
+            Id = "en-US-SaraNeural",
+            Name = "Sara",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "female",
+            DisplayName = "Sara (en-US) [F]",
+        },
+        new()
+        {
+            Id = "en-US-SerenaMultilingualNeural",
+            Name = "SerenaMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "female",
+            DisplayName = "SerenaMultilingual (en-US) [F]",
+        },
+        new()
+        {
+            Id = "en-US-ShimmerTurboMultilingualNeural",
+            Name = "ShimmerTurboMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "female",
+            DisplayName = "ShimmerTurboMultilingual (en-US) [F]",
+        },
+        new()
+        {
+            Id = "en-US-SteffanMultilingualNeural",
+            Name = "SteffanMultilingual",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "male",
+            DisplayName = "SteffanMultilingual (en-US) [M]",
+        },
+        new()
+        {
+            Id = "en-US-SteffanNeural",
+            Name = "Steffan",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "male",
+            DisplayName = "Steffan (en-US) [M]",
+        },
+        new()
+        {
+            Id = "en-US-TonyNeural",
+            Name = "Tony",
+            RawLanguage = "english",
+            Language = "en-US",
+            Gender = "male",
+            DisplayName = "Tony (en-US) [M]",
+        },
+        new()
+        {
+            Id = "en-AU-AnnetteNeural",
+            Name = "Annette",
+            RawLanguage = "english",
+            Language = "en-AU",
+            Gender = "female",
+            DisplayName = "Annette (en-AU) [F]",
+        },
+        new()
+        {
+            Id = "en-AU-CarlyNeural",
+            Name = "Carly",
+            RawLanguage = "english",
+            Language = "en-AU",
+            Gender = "female",
+            DisplayName = "Carly (en-AU) [F]",
+        },
+        new()
+        {
+            Id = "en-AU-DarrenNeural",
+            Name = "Darren",
+            RawLanguage = "english",
+            Language = "en-AU",
+            Gender = "male",
+            DisplayName = "Darren (en-AU) [M]",
+        },
+        new()
+        {
+            Id = "en-AU-DuncanNeural",
+            Name = "Duncan",
+            RawLanguage = "english",
+            Language = "en-AU",
+            Gender = "male",
+            DisplayName = "Duncan (en-AU) [M]",
+        },
+        new()
+        {
+            Id = "en-AU-ElsieNeural",
+            Name = "Elsie",
+            RawLanguage = "english",
+            Language = "en-AU",
+            Gender = "female",
+            DisplayName = "Elsie (en-AU) [F]",
+        },
+        new()
+        {
+            Id = "en-AU-FreyaNeural",
+            Name = "Freya",
+            RawLanguage = "english",
+            Language = "en-AU",
+            Gender = "female",
+            DisplayName = "Freya (en-AU) [F]",
+        },
+        new()
+        {
+            Id = "en-AU-JoanneNeural",
+            Name = "Joanne",
+            RawLanguage = "english",
+            Language = "en-AU",
+            Gender = "female",
+            DisplayName = "Joanne (en-AU) [F]",
+        },
+        new()
+        {
+            Id = "en-AU-KenNeural",
+            Name = "Ken",
+            RawLanguage = "english",
+            Language = "en-AU",
+            Gender = "male",
+            DisplayName = "Ken (en-AU) [M]",
+        },
+        new()
+        {
+            Id = "en-AU-KimNeural",
+            Name = "Kim",
+            RawLanguage = "english",
+            Language = "en-AU",
+            Gender = "female",
+            DisplayName = "Kim (en-AU) [F]",
+        },
+        new()
+        {
+            Id = "en-AU-NatashaNeural",
+            Name = "Natasha",
+            RawLanguage = "english",
+            Language = "en-AU",
+            Gender = "female",
+            DisplayName = "Natasha (en-AU) [F]",
+        },
+        new()
+        {
+            Id = "en-AU-NeilNeural",
+            Name = "Neil",
+            RawLanguage = "english",
+            Language = "en-AU",
+            Gender = "male",
+            DisplayName = "Neil (en-AU) [M]",
+        },
+        new()
+        {
+            Id = "en-AU-TimNeural",
+            Name = "Tim",
+            RawLanguage = "english",
+            Language = "en-AU",
+            Gender = "male",
+            DisplayName = "Tim (en-AU) [M]",
+        },
+        new()
+        {
+            Id = "en-AU-TinaNeural",
+            Name = "Tina",
+            RawLanguage = "english",
+            Language = "en-AU",
+            Gender = "female",
+            DisplayName = "Tina (en-AU) [F]",
+        },
+        new()
+        {
+            Id = "en-AU-WilliamMultilingualNeural",
+            Name = "WilliamMultilingual",
+            RawLanguage = "english",
+            Language = "en-AU",
+            Gender = "male",
+            DisplayName = "WilliamMultilingual (en-AU) [M]",
+        },
+        new()
+        {
+            Id = "en-AU-WilliamNeural",
+            Name = "William",
+            RawLanguage = "english",
+            Language = "en-AU",
+            Gender = "male",
+            DisplayName = "William (en-AU) [M]",
+        },
+        new()
+        {
+            Id = "en-CA-ClaraNeural",
+            Name = "Clara",
+            RawLanguage = "english",
+            Language = "en-CA",
+            Gender = "female",
+            DisplayName = "Clara (en-CA) [F]",
+        },
+        new()
+        {
+            Id = "en-CA-LiamNeural",
+            Name = "Liam",
+            RawLanguage = "english",
+            Language = "en-CA",
+            Gender = "male",
+            DisplayName = "Liam (en-CA) [M]",
+        },
+        new()
+        {
+            Id = "en-GB-AbbiNeural",
+            Name = "Abbi",
+            RawLanguage = "english",
+            Language = "en-GB",
+            Gender = "female",
+            DisplayName = "Abbi (en-GB) [F]",
+        },
+        new()
+        {
+            Id = "en-GB-AdaMultilingualNeural",
+            Name = "AdaMultilingual",
+            RawLanguage = "english",
+            Language = "en-GB",
+            Gender = "female",
+            DisplayName = "AdaMultilingual (en-GB) [F]",
+        },
+        new()
+        {
+            Id = "en-GB-AlfieNeural",
+            Name = "Alfie",
+            RawLanguage = "english",
+            Language = "en-GB",
+            Gender = "male",
+            DisplayName = "Alfie (en-GB) [M]",
+        },
+        new()
+        {
+            Id = "en-GB-BellaNeural",
+            Name = "Bella",
+            RawLanguage = "english",
+            Language = "en-GB",
+            Gender = "female",
+            DisplayName = "Bella (en-GB) [F]",
+        },
+        new()
+        {
+            Id = "en-GB-ElliotNeural",
+            Name = "Elliot",
+            RawLanguage = "english",
+            Language = "en-GB",
+            Gender = "male",
+            DisplayName = "Elliot (en-GB) [M]",
         },
         new()
         {
             Id = "en-GB-EthanNeural",
             Name = "Ethan",
-            RawLanguage = "british_english",
-            Language = "EN-UK",
+            RawLanguage = "english",
+            Language = "en-GB",
             Gender = "male",
-            DisplayName = "Ethan (EN-UK) [M]",
+            DisplayName = "Ethan (en-GB) [M]",
+        },
+        new()
+        {
+            Id = "en-GB-HollieNeural",
+            Name = "Hollie",
+            RawLanguage = "english",
+            Language = "en-GB",
+            Gender = "female",
+            DisplayName = "Hollie (en-GB) [F]",
+        },
+        new()
+        {
+            Id = "en-GB-LibbyNeural",
+            Name = "Libby",
+            RawLanguage = "english",
+            Language = "en-GB",
+            Gender = "female",
+            DisplayName = "Libby (en-GB) [F]",
+        },
+        new()
+        {
+            Id = "en-GB-MaisieNeural",
+            Name = "Maisie",
+            RawLanguage = "english",
+            Language = "en-GB",
+            Gender = "female",
+            DisplayName = "Maisie (en-GB) [F]",
+        },
+        new()
+        {
+            Id = "en-GB-NoahNeural",
+            Name = "Noah",
+            RawLanguage = "english",
+            Language = "en-GB",
+            Gender = "male",
+            DisplayName = "Noah (en-GB) [M]",
         },
         new()
         {
             Id = "en-GB-OliverNeural",
             Name = "Oliver",
-            RawLanguage = "british_english",
-            Language = "EN-UK",
+            RawLanguage = "english",
+            Language = "en-GB",
             Gender = "male",
-            DisplayName = "Oliver (EN-UK) [M]",
+            DisplayName = "Oliver (en-GB) [M]",
+        },
+        new()
+        {
+            Id = "en-GB-OliviaNeural",
+            Name = "Olivia",
+            RawLanguage = "english",
+            Language = "en-GB",
+            Gender = "female",
+            DisplayName = "Olivia (en-GB) [F]",
+        },
+        new()
+        {
+            Id = "en-GB-OllieMultilingualNeural",
+            Name = "OllieMultilingual",
+            RawLanguage = "english",
+            Language = "en-GB",
+            Gender = "male",
+            DisplayName = "OllieMultilingual (en-GB) [M]",
+        },
+        new()
+        {
+            Id = "en-GB-RyanNeural",
+            Name = "Ryan",
+            RawLanguage = "english",
+            Language = "en-GB",
+            Gender = "male",
+            DisplayName = "Ryan (en-GB) [M]",
+        },
+        new()
+        {
+            Id = "en-GB-SoniaNeural",
+            Name = "Sonia",
+            RawLanguage = "english",
+            Language = "en-GB",
+            Gender = "female",
+            DisplayName = "Sonia (en-GB) [F]",
+        },
+        new()
+        {
+            Id = "en-GB-ThomasNeural",
+            Name = "Thomas",
+            RawLanguage = "english",
+            Language = "en-GB",
+            Gender = "male",
+            DisplayName = "Thomas (en-GB) [M]",
+        },
+        new()
+        {
+            Id = "en-HK-SamNeural",
+            Name = "Sam",
+            RawLanguage = "english",
+            Language = "en-HK",
+            Gender = "male",
+            DisplayName = "Sam (en-HK) [M]",
+        },
+        new()
+        {
+            Id = "en-HK-YanNeural",
+            Name = "Yan",
+            RawLanguage = "english",
+            Language = "en-HK",
+            Gender = "female",
+            DisplayName = "Yan (en-HK) [F]",
+        },
+        new()
+        {
+            Id = "en-IE-ConnorNeural",
+            Name = "Connor",
+            RawLanguage = "english",
+            Language = "en-IE",
+            Gender = "male",
+            DisplayName = "Connor (en-IE) [M]",
+        },
+        new()
+        {
+            Id = "en-IE-EmilyNeural",
+            Name = "Emily",
+            RawLanguage = "english",
+            Language = "en-IE",
+            Gender = "female",
+            DisplayName = "Emily (en-IE) [F]",
+        },
+        new()
+        {
+            Id = "en-IN-AaravNeural",
+            Name = "Aarav",
+            RawLanguage = "english",
+            Language = "en-IN",
+            Gender = "male",
+            DisplayName = "Aarav (en-IN) [M]",
+        },
+        new()
+        {
+            Id = "en-IN-AartiIndicNeural",
+            Name = "AartiIndic",
+            RawLanguage = "english",
+            Language = "en-IN",
+            Gender = "female",
+            DisplayName = "AartiIndic (en-IN) [F]",
+        },
+        new()
+        {
+            Id = "en-IN-AartiNeural",
+            Name = "Aarti",
+            RawLanguage = "english",
+            Language = "en-IN",
+            Gender = "female",
+            DisplayName = "Aarti (en-IN) [F]",
+        },
+        new()
+        {
+            Id = "en-IN-AashiNeural",
+            Name = "Aashi",
+            RawLanguage = "english",
+            Language = "en-IN",
+            Gender = "female",
+            DisplayName = "Aashi (en-IN) [F]",
+        },
+        new()
+        {
+            Id = "en-IN-AnanyaNeural",
+            Name = "Ananya",
+            RawLanguage = "english",
+            Language = "en-IN",
+            Gender = "female",
+            DisplayName = "Ananya (en-IN) [F]",
+        },
+        new()
+        {
+            Id = "en-IN-ArjunIndicNeural",
+            Name = "ArjunIndic",
+            RawLanguage = "english",
+            Language = "en-IN",
+            Gender = "male",
+            DisplayName = "ArjunIndic (en-IN) [M]",
+        },
+        new()
+        {
+            Id = "en-IN-ArjunNeural",
+            Name = "Arjun",
+            RawLanguage = "english",
+            Language = "en-IN",
+            Gender = "male",
+            DisplayName = "Arjun (en-IN) [M]",
+        },
+        new()
+        {
+            Id = "en-IN-KavyaNeural",
+            Name = "Kavya",
+            RawLanguage = "english",
+            Language = "en-IN",
+            Gender = "female",
+            DisplayName = "Kavya (en-IN) [F]",
+        },
+        new()
+        {
+            Id = "en-IN-KunalNeural",
+            Name = "Kunal",
+            RawLanguage = "english",
+            Language = "en-IN",
+            Gender = "male",
+            DisplayName = "Kunal (en-IN) [M]",
+        },
+        new()
+        {
+            Id = "en-IN-NeerjaIndicNeural",
+            Name = "NeerjaIndic",
+            RawLanguage = "english",
+            Language = "en-IN",
+            Gender = "female",
+            DisplayName = "NeerjaIndic (en-IN) [F]",
+        },
+        new()
+        {
+            Id = "en-IN-NeerjaNeural",
+            Name = "Neerja",
+            RawLanguage = "english",
+            Language = "en-IN",
+            Gender = "female",
+            DisplayName = "Neerja (en-IN) [F]",
+        },
+        new()
+        {
+            Id = "en-IN-PrabhatIndicNeural",
+            Name = "PrabhatIndic",
+            RawLanguage = "english",
+            Language = "en-IN",
+            Gender = "male",
+            DisplayName = "PrabhatIndic (en-IN) [M]",
+        },
+        new()
+        {
+            Id = "en-IN-PrabhatNeural",
+            Name = "Prabhat",
+            RawLanguage = "english",
+            Language = "en-IN",
+            Gender = "male",
+            DisplayName = "Prabhat (en-IN) [M]",
+        },
+        new()
+        {
+            Id = "en-IN-RehaanNeural",
+            Name = "Rehaan",
+            RawLanguage = "english",
+            Language = "en-IN",
+            Gender = "male",
+            DisplayName = "Rehaan (en-IN) [M]",
+        },
+        new()
+        {
+            Id = "en-KE-AsiliaNeural",
+            Name = "Asilia",
+            RawLanguage = "english",
+            Language = "en-KE",
+            Gender = "female",
+            DisplayName = "Asilia (en-KE) [F]",
+        },
+        new()
+        {
+            Id = "en-KE-ChilembaNeural",
+            Name = "Chilemba",
+            RawLanguage = "english",
+            Language = "en-KE",
+            Gender = "male",
+            DisplayName = "Chilemba (en-KE) [M]",
+        },
+        new()
+        {
+            Id = "en-NG-AbeoNeural",
+            Name = "Abeo",
+            RawLanguage = "english",
+            Language = "en-NG",
+            Gender = "male",
+            DisplayName = "Abeo (en-NG) [M]",
+        },
+        new()
+        {
+            Id = "en-NG-EzinneNeural",
+            Name = "Ezinne",
+            RawLanguage = "english",
+            Language = "en-NG",
+            Gender = "female",
+            DisplayName = "Ezinne (en-NG) [F]",
+        },
+        new()
+        {
+            Id = "en-NZ-MitchellNeural",
+            Name = "Mitchell",
+            RawLanguage = "english",
+            Language = "en-NZ",
+            Gender = "male",
+            DisplayName = "Mitchell (en-NZ) [M]",
+        },
+        new()
+        {
+            Id = "en-NZ-MollyNeural",
+            Name = "Molly",
+            RawLanguage = "english",
+            Language = "en-NZ",
+            Gender = "female",
+            DisplayName = "Molly (en-NZ) [F]",
+        },
+        new()
+        {
+            Id = "en-PH-JamesNeural",
+            Name = "James",
+            RawLanguage = "english",
+            Language = "en-PH",
+            Gender = "male",
+            DisplayName = "James (en-PH) [M]",
+        },
+        new()
+        {
+            Id = "en-PH-RosaNeural",
+            Name = "Rosa",
+            RawLanguage = "english",
+            Language = "en-PH",
+            Gender = "female",
+            DisplayName = "Rosa (en-PH) [F]",
+        },
+        new()
+        {
+            Id = "en-SG-LunaNeural",
+            Name = "Luna",
+            RawLanguage = "english",
+            Language = "en-SG",
+            Gender = "female",
+            DisplayName = "Luna (en-SG) [F]",
+        },
+        new()
+        {
+            Id = "en-SG-WayneNeural",
+            Name = "Wayne",
+            RawLanguage = "english",
+            Language = "en-SG",
+            Gender = "male",
+            DisplayName = "Wayne (en-SG) [M]",
+        },
+        new()
+        {
+            Id = "en-TZ-ElimuNeural",
+            Name = "Elimu",
+            RawLanguage = "english",
+            Language = "en-TZ",
+            Gender = "male",
+            DisplayName = "Elimu (en-TZ) [M]",
+        },
+        new()
+        {
+            Id = "en-TZ-ImaniNeural",
+            Name = "Imani",
+            RawLanguage = "english",
+            Language = "en-TZ",
+            Gender = "female",
+            DisplayName = "Imani (en-TZ) [F]",
+        },
+        new()
+        {
+            Id = "en-ZA-LeahNeural",
+            Name = "Leah",
+            RawLanguage = "english",
+            Language = "en-ZA",
+            Gender = "female",
+            DisplayName = "Leah (en-ZA) [F]",
+        },
+        new()
+        {
+            Id = "en-ZA-LukeNeural",
+            Name = "Luke",
+            RawLanguage = "english",
+            Language = "en-ZA",
+            Gender = "male",
+            DisplayName = "Luke (en-ZA) [M]",
         },
     };
 
@@ -319,6 +1183,11 @@ public class AzureTtsService : ITtsService
             if (!string.IsNullOrWhiteSpace(region))
             {
                 _speechConfig = SpeechConfig.FromSubscription(key, region);
+                _log.Debug($"[FF14P2TTS-Azure] Using Azure region: {region}");
+                if (!string.IsNullOrWhiteSpace(endpoint))
+                {
+                    _log.Warning("[FF14P2TTS-Azure] AzureRegion is set, so AzureEndpoint is ignored. Clear the region field to use the custom endpoint.");
+                }
             }
             else if (!string.IsNullOrWhiteSpace(endpoint))
             {
@@ -350,10 +1219,34 @@ public class AzureTtsService : ITtsService
         return true; // Azure is cloud-based; we can't easily ping without making a call
     }
 
-    public Task<List<VoiceInfo>> GetAvailableVoicesRawAsync(CancellationToken ct = default)
+    public async Task<List<VoiceInfo>> GetAvailableVoicesRawAsync(CancellationToken ct = default)
     {
-        // Return known voices + allow custom entry
+        // Start from the built-in catalog so the UI always has a complete English list.
         var voices = new List<VoiceInfo>(KnownEnglishVoices);
+
+        // Prefer a live fetch so newly released Azure voices appear without a plugin update.
+        var fetched = await FetchVoicesFromAzureAsync(ct).ConfigureAwait(false);
+        if (fetched is { Count: > 0 })
+        {
+            foreach (var voice in fetched)
+            {
+                var existing = voices.FirstOrDefault(v =>
+                    string.Equals(v.Id, voice.Id, StringComparison.OrdinalIgnoreCase));
+                if (existing is null)
+                {
+                    voices.Add(voice);
+                }
+                else
+                {
+                    // Refresh metadata from the live catalog while keeping a stable object identity.
+                    existing.Name = voice.Name;
+                    existing.RawLanguage = voice.RawLanguage;
+                    existing.Language = voice.Language;
+                    existing.Gender = voice.Gender;
+                    existing.DisplayName = voice.DisplayName;
+                }
+            }
+        }
 
         // If the user's configured voices aren't in the known list, add them
         AddCustomVoiceIfMissing(voices, _config.AzureDefaultVoice);
@@ -361,7 +1254,101 @@ public class AzureTtsService : ITtsService
         AddCustomVoiceIfMissing(voices, _config.AzureMaleVoice);
         AddCustomVoiceIfMissing(voices, _config.AzureFemaleVoice);
 
-        return Task.FromResult(voices);
+        return voices;
+    }
+
+    /// <summary>
+    /// Fetches the authoritative voice list from the Azure Speech REST endpoint and
+    /// returns the English subset. Returns null when the key is missing or the call fails,
+    /// so callers fall back to the built-in catalog.
+    /// </summary>
+    private async Task<List<VoiceInfo>?> FetchVoicesFromAzureAsync(CancellationToken ct)
+    {
+        var key = _config.AzureSubscriptionKey;
+        if (string.IsNullOrWhiteSpace(key))
+            return null;
+
+        var region = string.IsNullOrWhiteSpace(_config.AzureRegion)
+            ? "eastus"
+            : _config.AzureRegion.Trim();
+        var url = $"https://{region}.tts.speech.microsoft.com/cognitiveservices/voices/list";
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Add("Ocp-Apim-Subscription-Key", key);
+
+            using var response = await VoiceListHttpClient.SendAsync(request, ct).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                _log.Debug($"[FF14P2TTS-Azure] Voice list fetch returned {(int)response.StatusCode}; using built-in list.");
+                return null;
+            }
+
+            var json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+
+            var voices = new List<VoiceInfo>();
+            foreach (var element in doc.RootElement.EnumerateArray())
+            {
+                if (!element.TryGetProperty("ShortName", out var shortNameEl) ||
+                    !element.TryGetProperty("Locale", out var localeEl))
+                {
+                    continue;
+                }
+
+                var id = shortNameEl.GetString();
+                var locale = localeEl.GetString();
+                if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(locale))
+                    continue;
+                if (!locale.StartsWith("en", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var gender = element.TryGetProperty("Gender", out var genderEl) &&
+                             genderEl.ValueKind == JsonValueKind.String
+                    ? genderEl.GetString()?.ToLowerInvariant()
+                    : null;
+                var genderNormalized = gender switch
+                {
+                    "male" => "male",
+                    "female" => "female",
+                    _ => "not_specified",
+                };
+
+                var name = DeriveVoiceName(id);
+                var genderLetter = genderNormalized == "male" ? "M"
+                    : genderNormalized == "female" ? "F"
+                    : "?";
+
+                voices.Add(new VoiceInfo
+                {
+                    Id = id,
+                    Name = name,
+                    RawLanguage = "english",
+                    Language = locale,
+                    Gender = genderNormalized,
+                    DisplayName = $"{name} ({locale}) [{genderLetter}]",
+                });
+            }
+
+            return voices;
+        }
+        catch (Exception ex)
+        {
+            _log.Debug($"[FF14P2TTS-Azure] Voice list fetch error: {ex.Message}");
+            return null;
+        }
+    }
+
+    private static string DeriveVoiceName(string voiceId)
+    {
+        // "en-US-AriaNeural" -> "Aria"; "en-US-AdamMultilingualNeural" -> "AdamMultilingual"
+        var localeEnd = voiceId.IndexOf('-', 3);
+        var name = localeEnd > 0 ? voiceId[(localeEnd + 1)..] : voiceId;
+        const string suffix = "Neural";
+        if (name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+            name = name[..^suffix.Length];
+        return name;
     }
 
     private static void AddCustomVoiceIfMissing(List<VoiceInfo> voices, string voiceName)
@@ -398,6 +1385,12 @@ public class AzureTtsService : ITtsService
     {
         if (string.IsNullOrWhiteSpace(text))
             return;
+
+        if (string.IsNullOrWhiteSpace(_config.AzureSubscriptionKey))
+        {
+            _log.Error("[FF14P2TTS-Azure] Cannot speak: Azure subscription key is empty. Set it under /p2tts -> Azure Connection.");
+            return;
+        }
 
         text = SanitizeText(text);
 

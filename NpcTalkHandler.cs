@@ -92,7 +92,7 @@ public class NpcTalkHandler : IDisposable
 
         _lastNpcText = text;
 
-        _log.Debug($"[FF14P2TTS] NPC {source}: {text}");
+        _log.Information($"[FF14P2TTS] NPC {source}: {text}");
         OnNpcTalk?.Invoke(speaker, text);
     }
 

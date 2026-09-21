@@ -24,6 +24,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
     [PluginService] internal static IClientState ClientState { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
+    [PluginService] internal static IGameGui GameGui { get; private set; } = null!;
 
     private const string CommandName = "/ff14tts";
 
@@ -403,7 +404,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnNpcTalk(string speaker, string text)
     {
-        _ = _npcDialogueCoordinator.HandleAsync(speaker, text, _dialogueTester.IsNativeVoiceSubtitleActive());
+        _ = _npcDialogueCoordinator.HandleAsync(speaker, text, () => _dialogueTester.IsTalkSubtitleVisibleNow());
     }
 
     private void OnTerritoryChanged(uint territoryType)

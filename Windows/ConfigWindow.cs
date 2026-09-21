@@ -472,7 +472,7 @@ public class ConfigWindow : Window, IDisposable
 
         // Filter voices to English only
         var enVoices = cachedVoices
-            .Where(v => v.RawLanguage == "american_english" || v.RawLanguage == "british_english")
+            .Where(v => v.Language.StartsWith("en", StringComparison.OrdinalIgnoreCase))
             .ToList();
         if (enVoices.Count == 0) enVoices = cachedVoices;
 
@@ -689,9 +689,9 @@ public class ConfigWindow : Window, IDisposable
 
         if (cachedVoices is { Count: > 0 })
         {
-            // Filter to English only (US + UK)
+            // Filter to English only (all en-* locales)
             var enVoices = cachedVoices
-                .Where(v => v.RawLanguage == "american_english" || v.RawLanguage == "british_english")
+                .Where(v => v.Language.StartsWith("en", StringComparison.OrdinalIgnoreCase))
                 .ToList();
             if (enVoices.Count == 0) enVoices = cachedVoices;
 
